@@ -3,6 +3,10 @@
 
 // méthode qui permet de vérifier si une commande est valide.
 // Ne prend pas en compte les compte les commandes avec des chiffres
+// retours possibles :
+//   - 0 : succès
+//   - 1 : échec
+//   - 2 : commande se terminant par un &, il faut alors la lancer en arrière plan
 int verifierCommande(char *commande){
 
     // expression régulière de l'automate : 
@@ -13,8 +17,9 @@ int verifierCommande(char *commande){
     #define S_ESPACE                3
     #define S_TIRET                 4
     #define S_LETTRE_APRES_TIRET    5
-    #define S_FINI                  6
-    #define S_ERREUR                7
+    #define S_ET_COMMERCIAL         6
+    #define S_FINI                  7
+    #define S_ERREUR                8
 
     // état de départ
     int state = S_DEPART;
@@ -76,6 +81,9 @@ int verifierCommande(char *commande){
                     case '\0': // la fin de la commande
                         state = S_FINI;
                         break;
+                    case '&':
+                        state = S_ET_COMMERCIAL;
+                        break;
                     default:
                         state = S_ERREUR;
                         break;
@@ -105,15 +113,24 @@ int verifierCommande(char *commande){
                         break;
                 }
                 break;
+            case S_ET_COMMERCIAL: // après un & on ne peut trouver que des espaces
+                switch(caractereCourant){
+                    case ' ': // si on a un espace alors on retourne dans cette partie de l'automate jusqu'à arriver à la fin de la commande ou jusqu'à ce qu'on tombe sur un caractère 
+                        state = S_ET_COMMERCIAL;
+                        break;
+                    default: // si on tombe sur autre chose qu'un espace alors il y a une erreur
+                        state = S_ERREUR;
+                        break;
+                }
         }
     }
-    if(state == S_ERREUR){
-        return 1; // 1 correspond à une erreur 
-    }
+    if(state == S_ET_COMMERCIAL) return 2; // correspond à une commande à lancer en arrière plan
 
-    //réussite
-    return 0;
+    if(state == S_ERREUR) return 1; // 1 correspond à une erreur 
+
+    return 0; //réussite
 }
+
 
 
 
