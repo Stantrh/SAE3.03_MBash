@@ -3,7 +3,7 @@
 
 // méthode qui permet de vérifier si une commande est valide.
 // Ne prend pas en compte les compte les commandes avec des chiffres
-public int verifierCommande(char *commande){
+int verifierCommande(char *commande){
 
     // expression régulière de l'automate : 
     // \s*[a-zA-Z]+\s*(-{1}[a-zA-Z]+\s*)*
@@ -17,14 +17,14 @@ public int verifierCommande(char *commande){
     #define S_ERREUR                7
 
     // état de départ
-    state = S_DEPART;
+    int state = S_DEPART;
     // compteur pour parcourir tous les caractères de la commande
     int indice = 0;
 
     //on parcourt toute la commande qui est à vérifier, jusqu'a ce qu'on arrive à la fin ou qu'on tombe sur une erreur 
     while(state < S_FINI){
         //on récupère le premier caractère de la commande
-        caractereCourant = commande[indice];
+        char caractereCourant = commande[indice];
         //on incrémente le compteur pour la vérification du prochain caractère de la commande
         indice +=1;
         // pour tout les caractères de la commande, on vérifie si ils corespondent bien à une commande valide
@@ -112,7 +112,7 @@ public int verifierCommande(char *commande){
     }
 
     //réussite
-    return 0
+    return 0;
 }
 
 
