@@ -71,7 +71,7 @@ void mbash(char* recuperer) {
         }
     } else if (pid > 0) { // Si le pid est supérieur à 0 alors c'est encore le processus parent
         waitpid(pid, NULL, 0); // Donc il faut attendre que son processus fils se finisse
-    } else { // Si le fork n'a pas fonctionné on met l'erreur
+    } else { // Si le fork n'a pas fonctionné on met l'erreur, (pas assez de mémoire par exemple)
         perror("fork");
         exit(EXIT_FAILURE); // On termine le processus actuel
     }
