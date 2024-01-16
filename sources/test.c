@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <ctype.h>
+#include <wordexp.h>
 
 #define MAXLI 2048
 
@@ -129,7 +130,7 @@ char* recupererCheminCmd() {
 //   - 2 : commande se terminant par un &, il faut alors la lancer en arrière plan
 int verifierCommande(char *commande){
 
-    // expression régulière de l'automate : 
+    // expression régulière de la première version de l'automate : 
     // \s*[a-zA-Z]+\s*(-{1}[a-zA-Z]+\s*)*
 
     #define S_DEPART                1
@@ -138,6 +139,16 @@ int verifierCommande(char *commande){
     #define S_TIRET                 4
     #define S_LETTRE_APRES_TIRET    5
     #define S_ET_COMMERCIAL         6
+    #define S_EGAL
+    #define S_PREMIERE_COTE
+    #define S_LETTRE_ENTRE_COTE
+    #define S_ESPACE_ENTRE_COTE
+    #define S_SECONDE_COTE
+    #define S_SLASH
+    #define S_POINT
+    #define S_POINT_APRES_POINT
+    #define S_TILDA
+    #define S_LETTRE_APRES_SLASH
     #define S_FINI                  7
     #define S_ERREUR                8
 
@@ -185,7 +196,6 @@ int verifierCommande(char *commande){
                         break;
                     default:
                         if(isalpha(caractereCourant)){
-                            printf("%s", "COUCOUCOUCOU");
                             state = S_LETTRE;
                         }else{
                             state = S_ERREUR;
@@ -256,4 +266,24 @@ int verifierCommande(char *commande){
     if(state == S_ERREUR) return 1; // 1 correspond à une erreur 
 
     return 0; //réussite
+}
+
+// reussite : 0
+// échec : -1
+// méthode qui permet de changer le répertoire courant
+int cd(char *nouveauDossier){
+    // si l'on veut se déplacer dans le home (~) alors il faut associer le ~ au home (applelé expansion)
+    if(nouveauDossier[0]=='~'){
+        //variable temporaire utilisée pour l'assiciation du home
+        wordexp_t tmp;
+        if (wordexp(nouveauDossier, &tmp, 0) == 0) {
+            // variable contenant le résultat de l'expansion, le chemin du home se trouva dans la première case du tableau
+            chdir(tmp.we_wordv[0]);
+            // on libère la mémoire de la variable temporaire et de tout ce qu'elle peut contenir
+            wordfree(&tmp);
+        }
+    }
+    // on change de répertoire
+    int res = chdir(nouveauDossier);
+    return res;
 }
