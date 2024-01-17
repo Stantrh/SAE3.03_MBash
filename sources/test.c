@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <ctype.h>
+#include <wordexp.h>
 
 #define MAXLI 2048
 
@@ -14,43 +15,28 @@ void mbash(char* recuperer);
 char* recupererCheminCmd();
 
 
-
-int main(int argc, char** argv) {
-
-    printf(R"EOF(
-
-
-               __  ___    ___           __    _  __
-              /  |/  /___/ _ )___ ____ / /   | |/_/
-             / /|_/ /___/ _  / _ `(_-</ _ \  >  <  
-            /_/  /_/   /____/\_,_/___/_//_/ /_/|_| v0.1 
-
-            Par PIERROT Nathan et TROHA Stanislas 
-                                                    
-
-
-)EOF");
-
-    while (1) {
-        printf("\nCMD : ");
-
-        if (fgets(commande, MAXLI, stdin) != NULL) {
-            commande[strcspn(commande, "\n")] = '\0';
-
-            // Si l'utilisateur a entré quelque chose de vide (du style entrée)
-            if (strlen(commande) == 0) {
-                continue; // On recommence la boucle pour lui redemander
-            }
-
-            char* recuperer = recupererCheminCmd();
-            mbash(recuperer);
-            free(recuperer);
-        } else {
-            perror("fgets");
-            exit(EXIT_FAILURE);
+// reussite : 0
+// échec : -1
+// méthode qui permet de changer le répertoire courant
+int cd(char *nouveauDossier){
+    // si l'on veut se déplacer dans le home (~) alors il faut associer le ~ au home (applelé expansion)
+    if(nouveauDossier[0]=='~'){
+        printf("TRIPLE MONSTRE COUCOU \n");
+        //variable temporaire utilisée pour l'assiciation du home
+        wordexp_t tmp;
+        if (wordexp(nouveauDossier, &tmp, 0) == 0) {
+            // variable contenant le résultat de l'expansion, le chemin du home se trouva dans la première case du tableau
+            chdir(tmp.we_wordv[0]);
+            // on libère la mémoire de la variable temporaire et de tout ce qu'elle peut contenir
+            wordfree(&tmp);
         }
     }
-    return 0;
+    // on change de répertoire
+    int res = chdir(nouveauDossier);
+    if(res == -1){
+        perror("chdir");
+    }
+    return res;
 }
 
 void mbash(char* recuperer) {
@@ -76,8 +62,30 @@ void mbash(char* recuperer) {
         args[i] = NULL; // Dernier élément du tableau doit être NULLS
         char* env[] = {NULL};
 
-        if(recuperer != NULL){ // Si la commande which a retourné quelque chose
-            // On enregistre le code de retour de la commande avec execve
+        // Affichage de chaque élément du tableau args
+        printf("Contenu de args :\n");
+        for (int j = 0; args[j] != NULL; ++j) {
+            printf("args[%d] = %s\n", j, args[j]);
+        }
+
+        if(recuperer == NULL){ // Si la commande which n'a rien retourné alors il faut qu'on vérifie le nom de la commande pour voir si elle a été reprogrammée par nos soins
+             // Par convention et exigence de execve, le premier élément d'args doit toujours contenir le nom de la commande.
+                // Donc on a le nom de la commande
+            // Faire un switch est impossible car permet seulement de comparer un caractère à la fois ou des entiers etc... mais pas des chaînes directement
+            if(strcmp(args[0], "cd") == 0){
+
+                if (args[1] != NULL) {
+                    int res = cd(args[1]);
+                    if (res == -1) {
+                        fprintf(stderr, "Erreur lors de l'exécution de la commande cd\n");
+                    }
+                } else {
+                    fprintf(stderr, "Erreur : Argument manquant pour cd\n");
+                }
+                }
+            
+        }else{
+                // On enregistre le code de retour de la commande avec execve
             int retour = execve(recuperer, args, env);
             if(retour == -1){ // On catch une erreur et on l'affiche
                 perror("execve");
@@ -86,10 +94,11 @@ void mbash(char* recuperer) {
         }
 
 
+
         
     } else if (pid > 0) { // Si le pid est supérieur à 0 alors c'est encore le processus parent
         waitpid(pid, NULL, 0); // Donc il faut attendre que son processus fils se finisse
-    } else { // Si le fork n'a pas fonctionné on met l'erreur
+    } else { // Si le fork n'a pas fonctionné on met l'erreur, (pas assez de mémoire par exemple)
         perror("fork");
         exit(EXIT_FAILURE); // On termine le processus actuel
     }
@@ -134,3 +143,44 @@ char* recupererCheminCmd() {
     pclose(fp); // Puis on ferme le flux une fois les opérations terminées
     return chemin;
 }
+
+
+int main(int argc, char** argv) {
+
+    printf(R"EOF(
+
+
+               __  ___    ___           __    _  __
+              /  |/  /___/ _ )___ ____ / /   | |/_/
+             / /|_/ /___/ _  / _ `(_-</ _ \  >  <  
+            /_/  /_/   /____/\_,_/___/_//_/ /_/|_| v0.1 
+
+            Par PIERROT Nathan et TROHA Stanislas 
+                                                    
+
+
+)EOF");
+
+    while (1) {
+        printf("\nCMD : ");
+
+        if (fgets(commande, MAXLI, stdin) != NULL) {
+            commande[strcspn(commande, "\n")] = '\0';
+
+            // Si l'utilisateur a entré quelque chose de vide (du style entrée)
+            if (strlen(commande) == 0) {
+                continue; // On recommence la boucle pour lui redemander
+            }
+
+            char* recuperer = recupererCheminCmd();
+            mbash(recuperer);
+            free(recuperer);
+        } else {
+            perror("fgets");
+            exit(EXIT_FAILURE);
+        }
+    }
+    return 0;
+}
+
+
