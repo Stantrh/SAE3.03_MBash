@@ -8,6 +8,8 @@
 #include <wordexp.h>
 #include <time.h>
 #include <limits.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 
 #define TAILLEHISTORIQUE 100 // Pour le nombre de commandes que l'historique pourra contenir
 #define MAXLI 2048
@@ -49,12 +51,18 @@ void afficherHistorique(const Historique *historique){
 // méthode qui permet de changer le répertoire courant
 int cd(char *nouveauDossier) {
     // si l'on veut se déplacer dans le home (~) alors il faut associer le ~ au home (applelé expansion)
-    if (nouveauDossier[0] == '~') {
+    if (nouveauDossier == NULL || nouveauDossier[0] == '~') {
         // Si le chemin commence par ~, on l'expande manuellement
         const char *home = getenv("HOME");
         if (home != NULL) {
             char cheminComplet[PATH_MAX]; // PATH_MAX c'est une constante qui représente la taille max d'un chemin de fichier (au cas où)
-            snprintf(cheminComplet, sizeof(cheminComplet), "%s%s", home, nouveauDossier + 1); // On met dans cheminComplet  home avec le reste du chemin
+            // On doit faire la vérification car on peut pas modifier nouveauDossier dans un if sinon modification effective que dans le if
+            // Donc s'il est null, alors on change la manière de faire le sprintf
+            if (nouveauDossier == NULL) {
+                snprintf(cheminComplet, sizeof(cheminComplet), "%s", home);
+            } else {
+                snprintf(cheminComplet, sizeof(cheminComplet), "%s%s", home, nouveauDossier + 1); // On met dans cheminComplet  home avec le reste du chemin
+            }
             int res = chdir(cheminComplet);
             if (res == -1) {
                 perror("chdir");
@@ -82,17 +90,19 @@ void mbash(char* recuperer) {
     // Si le pid actuel est le pid du processus fils qui vient d'être créé alors le code qui va suivre c'est le processus fils qui va l'exécuter
     if (pid == 0) {
 
-        //printf("Chemin de l'exécutable : %s%s", recuperer, "\n");
+        // printf("Chemin de l'exécutable : %s%s", recuperer, "\n");
 
         // On crée le tableau d'arguments pour execve (chemin, arguments, et variables d'environnement) 
         char* args[MAXLI];
         char* token = strtok(commande, " "); // On sépare la commande en parties séparées par les espaces
         int i = 0;
 
+
         while (token != NULL) { // Puis chaque partie séparée par un espace correspond à un argument
             args[i++] = token;
             token = strtok(NULL, " ");
         }
+
 
         args[i] = NULL; // Dernier élément du tableau doit être NULLS
         char* env[] = {NULL};
@@ -108,15 +118,11 @@ void mbash(char* recuperer) {
                 // Donc on a le nom de la commande
             // Faire un switch est impossible car permet seulement de comparer un caractère à la fois ou des entiers etc... mais pas des chaînes directement
             if(strcmp(args[0], "cd") == 0){
-
-                if (args[1] != NULL) {
-                    int res = cd(args[1]);
-                    if (res == -1) {
-                        fprintf(stderr, "Erreur lors de l'exécution de la commande cd\n");
-                    }
-                } else {
-                    fprintf(stderr, "Erreur : Argument manquant pour cd\n");
+                int res = cd(args[1]);
+                if (res == -1) {
+                    fprintf(stderr, "Erreur lors de l'exécution de la commande cd\n");
                 }
+                
             }else if(strcmp(args[0], "history") == 0){
                 afficherHistorique(&historique);
             }else{
@@ -180,7 +186,6 @@ char* recupererCheminCmd() {
     pclose(fp); // Puis on ferme le flux une fois les opérations terminées
     return chemin;
 }
-
 
 // Méthode qui permet de changer le prompt du terminal
 int changerPrompt(char *nouveauPrompt){
@@ -275,12 +280,12 @@ int main(int argc, char** argv) {
     printf(R"EOF(
 
 
-               __  ___    ___           __    _  __
-              /  |/  /___/ _ )___ ____ / /   | |/_/
-             / /|_/ /___/ _  / _ `(_-</ _ \  >  <  
-            /_/  /_/   /____/\_,_/___/_//_/ /_/|_| v0.1 
-
-            Par PIERROT Nathan et TROHA Stanislas 
+                     __  ___    ___           __    _  __
+                    /  |/  /___/ _ )___ ____ / /   | |/_/
+                   / /|_/ /___/ _  / _ `(_-</ _ \  >  <  
+                  /_/  /_/   /____/\_,_/___/_//_/ /_/|_| v0.1 
+      
+                  Par PIERROT Nathan et TROHA Stanislas 
                                                     
 
 
@@ -288,27 +293,32 @@ int main(int argc, char** argv) {
 
     while (1) {
 
-        changerPrompt("\\t"); // juste pour tester
-        char* prompt = recupererPromptCourant();
-        printf("%s", prompt);
+    char* prompt = recupererPromptCourant();
+    // Lire une ligne avec readline
+    char *input = readline("CMD : ");
 
-        if (fgets(commande, MAXLI, stdin) != NULL) {
-            commande[strcspn(commande, "\n")] = '\0';
 
-            // Si l'utilisateur a entré quelque chose de vide (du style entrée)
-            if (strlen(commande) == 0) {
-                continue; // On recommence la boucle pour lui redemander
-            }
-
-            ajouterHistorique(&historique, commande);
-
-            char* recuperer = recupererCheminCmd();
-            mbash(recuperer);
-            free(recuperer);
-        } else {
-            perror("fgets");
-            exit(EXIT_FAILURE);
-        }
+    if (!input) {
+        // Gestion de la fin du fichier ou de l'erreur de lecture
+        break;
     }
+
+    if (input[0] != '\0') {
+        // Ajouter la ligne à l'historique seulement si elle n'est pas vide
+        add_history(input);
+        ajouterHistorique(&historique, input);
+        strcpy(commande, input);
+    }
+
+    if(strcmp(input, "exit") == 0){
+        printf("Merci d'avoir utilisé Mbash");
+        exit(0);
+    }
+
+    mbash(recupererCheminCmd());
+
+    free(input);
+}
+
     return 0;
 }
