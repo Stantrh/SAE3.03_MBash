@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 #include <ctype.h>
 #include <wordexp.h>
+#include <time.h>
 
 #define MAXLI 2048
 
@@ -13,8 +14,11 @@ char commande[MAXLI];
 
 void mbash(char* recuperer);
 char* recupererCheminCmd();
-
-
+int cd(char *nouveauDossier);
+int changerPrompt(char* nouveauPrompt);
+char* recupererPromptCourant();
+int verifierCommande(char *commande);
+char* recupererResultatComande(char* commande);
 
 int main(int argc, char** argv) {
 
@@ -32,8 +36,14 @@ int main(int argc, char** argv) {
 
 )EOF");
 
+    //changerPrompt(R"(\w \$ )");
+
     while (1) {
-        printf("CMD : ");
+        
+        changerPrompt("\\t");
+        
+        char* prompt = recupererPromptCourant();
+        printf("%s", prompt);
 
         if (fgets(commande, MAXLI, stdin) != NULL) {
             commande[strcspn(commande, "\n")] = '\0';
@@ -286,4 +296,111 @@ int cd(char *nouveauDossier){
     // on change de répertoire
     int res = chdir(nouveauDossier);
     return res;
+}
+
+// Méthode qui permet de changer le prompt du terminal
+int changerPrompt(char *nouveauPrompt){
+    //on change la variable d'environement qui correspond au PS1
+    int res = setenv("PS1", nouveauPrompt, 1);
+    return res;
+}
+
+// Méthode qui permet de récupérer le prompt courant pour l'afficher
+char* recupererPromptCourant() {
+    char* prompt = getenv("PS1");
+    char* promptCourant = NULL;
+
+    for (int i = 0; prompt[i] != '\0'; i++) {
+        if (prompt[i] == '\\') {
+            i++;
+            if (prompt[i] != '\0') {
+                switch (prompt[i]) {
+                    case 'w': //chemin absolut du répertoire courant
+                        promptCourant = recupererResultatComande("pwd");
+                        break;
+                    case 'u': //nom de l'utilisateur actuel
+                        promptCourant = recupererResultatComande("whoami");
+                        break;
+                    case 't': //heure au format HH:MM:SS
+                        // variable qui va contenir le nombre de secondes écoulées depuis le 1er janvier 1970
+                        time_t tempsActuel; 
+                        //structure qui permet de stocker des informations sur le temps
+                        struct tm *tempsInfo;
+
+                        //on récupère le nombre de secondes écoulées depuis le 1er janvier 1970
+                        time(&tempsActuel);
+                        //on les convertit pour obtenir des valeurs plus lisibles
+                        tempsInfo = localtime(&tempsActuel);
+
+                        //création du prompt
+                        char heure[9];
+                        sprintf(heure, "%02d:%02d:%02d", tempsInfo->tm_hour, tempsInfo->tm_min, tempsInfo->tm_sec);
+                        
+                        //on alloue la mémoire nécessaire
+                        promptCourant = malloc(strlen(prompt) + strlen(heure) + 4);
+
+                        //on ajojute \0 à la fin du prompt
+                        strncpy(promptCourant, prompt, i);
+                        promptCourant[i] = '\0';
+                        
+                        //on ajoute l'heure au prompt
+                        promptCourant = strdup(heure);
+                        break;
+                    case 'd': //date de la forme : mer. janv. 17
+                        // variable qui va contenir le nombre de secondes écoulées depuis le 1er janvier 1970
+                        time_t tempsActuel; 
+                        //structure qui permet de stocker des informations sur le temps
+                        struct tm *tempsInfo;
+
+                        //on récupère le nombre de secondes écoulées depuis le 1er janvier 1970
+                        time(&tempsActuel);
+                        //on les convertit pour obtenir des valeurs plus lisibles
+                        tempsInfo = localtime(&tempsActuel);
+
+                        //création du prompt
+                        char date[9];
+                        sprintf(date, "%02d:%02d:%02d", tempsInfo->tm_hour, tempsInfo->tm_min, tempsInfo->tm_sec);
+                        
+                        //on alloue la mémoire nécessaire
+                        promptCourant = malloc(strlen(prompt) + strlen(date) + 4);
+
+                        //on ajojute \0 à la fin du prompt
+                        strncpy(promptCourant, prompt, i);
+                        promptCourant[i] = '\0';
+                        
+                        //on ajoute la date au prompt
+                        promptCourant = strdup(date);
+                        break;
+                    default:
+                        //promptCourant = strdup(prompt);
+                        break;
+                }
+            } else if (prompt[i] == '\0') {
+                promptCourant = strdup(">");
+            }
+            break;
+        }
+    }
+    strcat(promptCourant, " $ ");
+    return promptCourant;
+}
+
+char* recupererResultatComande(char* commande){
+    //on créé un fichier pour stocker le résultat de pwd
+    FILE *fp = popen(commande, "r");
+    
+    //tableau qui va stocker le résultat de la commande
+    char res[1024];
+    if (fgets(res, sizeof(res), fp) == NULL) {
+        perror("fgets dans recupererResultatComande");
+        exit(EXIT_FAILURE);
+    }
+
+    //on enlève le \n de la fin de la ligne pour ne pas retourner à la ligne
+    res[strcspn(res, "\n")] = '\0';
+
+    //on ferme le fichier, on en a plus besoin
+    pclose(fp);
+
+    return strdup(res);
 }

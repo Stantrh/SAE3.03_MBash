@@ -7,17 +7,15 @@
 //   - 0 : succès
 //   - 1 : échec
 //   - 2 : commande se terminant par un &, il faut alors la lancer en arrière plan
-int verifierCommande(char *commande){
-
-    // expression régulière de l'automate : 
-    // \s*[a-zA-Z]+\s*(-{1}[a-zA-Z]+\s*)*
+int verifierArgumentPS1(char *argument){
 
     #define S_DEPART                1
-    #define S_LETTRE                2
-    #define S_ESPACE                3
-    #define S_TIRET                 4
-    #define S_LETTRE_APRES_TIRET    5
-    #define S_ET_COMMERCIAL         6
+    #define S_LETTRES_PS1
+    #define S_CARACTERE             2
+    #define S_PREMIER_GUILLEMET             3
+    #define S_BKSLASH                 4
+    #define S_LETTRE_APRES_BKSLASH    5
+    #define S_ESPACE         6
     #define S_FINI                  7
     #define S_ERREUR                8
 
