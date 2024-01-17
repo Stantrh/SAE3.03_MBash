@@ -6,7 +6,7 @@
 #include <sys/wait.h>
 #include <ctype.h>
 #include <wordexp.h>
-
+#include <limits.h>
 
 #define TAILLEHISTORIQUE 100 // Pour le nombre de commandes que l'historique pourra contenir
 #define MAXLI 2048
@@ -48,24 +48,31 @@ void afficherHistorique(const Historique *historique){
 // reussite : 0
 // échec : -1
 // méthode qui permet de changer le répertoire courant
-int cd(char *nouveauDossier){
+int cd(char *nouveauDossier) {
     // si l'on veut se déplacer dans le home (~) alors il faut associer le ~ au home (applelé expansion)
-    if(nouveauDossier[0]=='~'){
-        //variable temporaire utilisée pour l'assiciation du home
-        wordexp_t tmp;
-        if (wordexp(nouveauDossier, &tmp, 0) == 0) {
-            // variable contenant le résultat de l'expansion, le chemin du home se trouva dans la première case du tableau
-            chdir(tmp.we_wordv[0]);
-            // on libère la mémoire de la variable temporaire et de tout ce qu'elle peut contenir
-            wordfree(&tmp);
+    if (nouveauDossier[0] == '~') {
+        // Si le chemin commence par ~, on l'expande manuellement
+        const char *home = getenv("HOME");
+        if (home != NULL) {
+            char cheminComplet[PATH_MAX]; // PATH_MAX c'est une constante qui représente la taille max d'un chemin de fichier (au cas où)
+            snprintf(cheminComplet, sizeof(cheminComplet), "%s%s", home, nouveauDossier + 1); // On met dans cheminComplet  home avec le reste du chemin
+            int res = chdir(cheminComplet);
+            if (res == -1) {
+                perror("chdir");
+            }
+            return res;
+        } else {
+            fprintf(stderr, "Erreur : Impossible de récupérer le répertoire home\n");
+            return -1;
         }
+    } else {
+        // Si ce n'est pas ~, on change simplement de répertoire
+        int res = chdir(nouveauDossier);
+        if (res == -1) {
+            perror("chdir");
+        }
+        return res;
     }
-    // on change de répertoire
-    int res = chdir(nouveauDossier);
-    if(res == -1){
-        perror("chdir");
-    }
-    return res;
 }
 
 void mbash(char* recuperer) {
