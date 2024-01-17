@@ -7,7 +7,9 @@
 #include <ctype.h>
 #include <wordexp.h>
 #include <time.h>
+#include <limits.h>
 
+#define TAILLEHISTORIQUE 100 // Pour le nombre de commandes que l'historique pourra contenir
 #define MAXLI 2048
 
 char commande[MAXLI];
@@ -20,48 +22,64 @@ char* recupererPromptCourant();
 int verifierCommande(char *commande);
 char* recupererResultatComande(char* commande);
 
-int main(int argc, char** argv) {
+// On crée une structure qui contiendra le nombre de commandes et les commandes elles-mêmes
+typedef struct{
+    char commandes[TAILLEHISTORIQUE][MAXLI];
+    int count;
+} Historique;
 
-    printf(R"EOF(
-
-
-               __  ___    ___           __    _  __
-              /  |/  /___/ _ )___ ____ / /   | |/_/
-             / /|_/ /___/ _  / _ `(_-</ _ \  >  <  
-            /_/  /_/   /____/\_,_/___/_//_/ /_/|_| v0.1 
-
-            Par PIERROT Nathan et TROHA Stanislas 
-                                                    
+// On initialise l'historique pour pouvoir après l'utiliser dans mbash
+Historique historique;
 
 
-)EOF");
-
-    //changerPrompt(R"(\w \$ )");
-
-    while (1) {
-        
-        changerPrompt("\\t");
-        
-        char* prompt = recupererPromptCourant();
-        printf("%s", prompt);
-
-        if (fgets(commande, MAXLI, stdin) != NULL) {
-            commande[strcspn(commande, "\n")] = '\0';
-
-            // Si l'utilisateur a entré quelque chose de vide (du style entrée)
-            if (strlen(commande) == 0) {
-                continue; // On recommence la boucle pour lui redemander
-            }
-
-            char* recuperer = recupererCheminCmd();
-            mbash(recuperer);
-            free(recuperer);
-        } else {
-            perror("fgets");
-            exit(EXIT_FAILURE);
+void ajouterHistorique(Historique *historique, const char *cmd){
+    if(historique->count < TAILLEHISTORIQUE){ // Si l'historique n'est pas complètement rempli
+        strcpy(historique->commandes[historique->count], cmd);
+        historique->count++;
+    }else{ // Sinon il est plein et il faut décaler les commandes pour supprimer la toute première
+        for(int i = 0; i < TAILLEHISTORIQUE - 1; i++){
+            strcpy(historique->commandes[i], historique->commandes[i+1]);
         }
+        strcpy(historique->commandes[TAILLEHISTORIQUE - 1], cmd);
     }
-    return 0;
+}
+
+void afficherHistorique(const Historique *historique){
+    for(int i = 0; i < historique->count; i++){
+        printf("%d: %s\n", i + 1, historique->commandes[i]);
+    }
+}
+
+
+
+// reussite : 0
+// échec : -1
+// méthode qui permet de changer le répertoire courant
+int cd(char *nouveauDossier) {
+    // si l'on veut se déplacer dans le home (~) alors il faut associer le ~ au home (applelé expansion)
+    if (nouveauDossier[0] == '~') {
+        // Si le chemin commence par ~, on l'expande manuellement
+        const char *home = getenv("HOME");
+        if (home != NULL) {
+            char cheminComplet[PATH_MAX]; // PATH_MAX c'est une constante qui représente la taille max d'un chemin de fichier (au cas où)
+            snprintf(cheminComplet, sizeof(cheminComplet), "%s%s", home, nouveauDossier + 1); // On met dans cheminComplet  home avec le reste du chemin
+            int res = chdir(cheminComplet);
+            if (res == -1) {
+                perror("chdir");
+            }
+            return res;
+        } else {
+            fprintf(stderr, "Erreur : Impossible de récupérer le répertoire home\n");
+            return -1;
+        }
+    } else {
+        // Si ce n'est pas ~, on change simplement de répertoire
+        int res = chdir(nouveauDossier);
+        if (res == -1) {
+            perror("chdir");
+        }
+        return res;
+    }
 }
 
 void mbash(char* recuperer) {
@@ -72,17 +90,59 @@ void mbash(char* recuperer) {
     // Si le pid actuel est le pid du processus fils qui vient d'être créé alors le code qui va suivre c'est le processus fils qui va l'exécuter
     if (pid == 0) {
 
-        printf("Chemin de l'exécutable : %s%s", recuperer, "\n");
+        //printf("Chemin de l'exécutable : %s%s", recuperer, "\n");
+
         // On crée le tableau d'arguments pour execve (chemin, arguments, et variables d'environnement) 
-        char* args[] = {recuperer, NULL};
+        char* args[MAXLI];
+        char* token = strtok(commande, " "); // On sépare la commande en parties séparées par les espaces
+        int i = 0;
+
+        while (token != NULL) { // Puis chaque partie séparée par un espace correspond à un argument
+            args[i++] = token;
+            token = strtok(NULL, " ");
+        }
+
+        args[i] = NULL; // Dernier élément du tableau doit être NULLS
         char* env[] = {NULL};
 
-        // On enregistre le code de retour de la commande avec execve
-        int retour = execve(recuperer, args, env);
-        if(retour == -1){ // On catch une erreur et on l'affiche
-            perror("execve");
-            exit(EXIT_FAILURE); // On termine le processus fils
+        // Affichage de chaque élément du tableau args
+        //printf("Contenu de args :\n");
+        //for (int j = 0; args[j] != NULL; ++j) {
+        //    printf("args[%d] = %s\n", j, args[j]);
+        //}
+
+        if(recuperer == NULL){ // Si la commande which n'a rien retourné alors il faut qu'on vérifie le nom de la commande pour voir si elle a été reprogrammée par nos soins
+             // Par convention et exigence de execve, le premier élément d'args doit toujours contenir le nom de la commande.
+                // Donc on a le nom de la commande
+            // Faire un switch est impossible car permet seulement de comparer un caractère à la fois ou des entiers etc... mais pas des chaînes directement
+            if(strcmp(args[0], "cd") == 0){
+
+                if (args[1] != NULL) {
+                    int res = cd(args[1]);
+                    if (res == -1) {
+                        fprintf(stderr, "Erreur lors de l'exécution de la commande cd\n");
+                    }
+                } else {
+                    fprintf(stderr, "Erreur : Argument manquant pour cd\n");
+                }
+            }else if(strcmp(args[0], "history") == 0){
+                afficherHistorique(&historique);
+            }else{
+                printf("%s", "Commande à reprogrammer car contenue directement dans Bash ou alors inexistante\n");
+            }
+            
+        }else{
+                // On enregistre le code de retour de la commande avec execve
+            int retour = execve(recuperer, args, env);
+            if(retour == -1){ // On catch une erreur et on l'affiche
+                perror("execve");
+                exit(EXIT_FAILURE); // On termine le processus fils
+            }
         }
+
+
+
+        
     } else if (pid > 0) { // Si le pid est supérieur à 0 alors c'est encore le processus parent
         waitpid(pid, NULL, 0); // Donc il faut attendre que son processus fils se finisse
     } else { // Si le fork n'a pas fonctionné on met l'erreur, (pas assez de mémoire par exemple)
@@ -101,10 +161,10 @@ char* recupererCheminCmd() {
 
     char* chemin = (char*)malloc(MAXLI * 2 + 1);
 
-    // 
+     
     sprintf(chemin, "which %s", commande); // sprintf ça stocke dans un buffer pré aloué, donc là ça va stocker dans chemin la commande totale du which
 
-    printf("VALEUR DU SPRINTF : %s%s", chemin, "\n");
+    //printf("VALEUR DU SPRINTF : %s%s", chemin, "\n");
 
     // Ensuite ce que popen fait c'est qu'il exécute la commande which + nom commande et lit la sortie de cette commande
     fp = popen(chemin, "r");
@@ -119,163 +179,14 @@ char* recupererCheminCmd() {
         path[strcspn(path, "\n")] = '\0';
         
         strcpy(chemin, path);
-        int succes = verifierCommande(path);
-        printf("Succes de la commande : %d%s", succes, "\n");
 
     } else { // Sinon ça veut dire que ça n'a rien retourné, donc soit que l'utilisateur a entré une commande native à Bash (genre cd etc...) soit une commande qui n'existe pas
         // Pour l'instant on ne traite pas la différence entre les deux cas, on met l'automate d'abord.
-        printf("%s", "Commande à reprogrammer car contenue directement dans Bash ou alors inexistante\n");
+        chemin = NULL;
     }
 
     pclose(fp); // Puis on ferme le flux une fois les opérations terminées
     return chemin;
-}
-
-
-// méthode qui permet de vérifier si une commande est valide.
-// Ne prend pas en compte les compte les commandes avec des chiffres
-// retours possibles :
-//   - 0 : succès
-//   - 1 : échec
-//   - 2 : commande se terminant par un &, il faut alors la lancer en arrière plan
-int verifierCommande(char *commande){
-
-    // expression régulière de la première version de l'automate : 
-    // \s*[a-zA-Z]+\s*(-{1}[a-zA-Z]+\s*)*
-
-    #define S_DEPART                1
-    #define S_LETTRE                2
-    #define S_ESPACE                3
-    #define S_TIRET                 4
-    #define S_LETTRE_APRES_TIRET    5
-    #define S_ET_COMMERCIAL         6
-    #define S_EGAL
-    #define S_PREMIERE_COTE
-    #define S_LETTRE_ENTRE_COTE
-    #define S_ESPACE_ENTRE_COTE
-    #define S_SECONDE_COTE
-    #define S_SLASH
-    #define S_POINT
-    #define S_POINT_APRES_POINT
-    #define S_TILDA
-    #define S_LETTRE_APRES_SLASH
-    #define S_FINI                  7
-    #define S_ERREUR                8
-
-    // état de départ
-    int state = S_DEPART;
-    // compteur pour parcourir tous les caractères de la commande
-    int indice = 0;
-
-    //on parcourt toute la commande qui est à vérifier, jusqu'a ce qu'on arrive à la fin ou qu'on tombe sur une erreur 
-    while(state < S_FINI){
-        //on récupère le premier caractère de la commande
-        char caractereCourant = commande[indice];
-        //on incrémente le compteur pour la vérification du prochain caractère de la commande
-        indice +=1;
-        // pour tout les caractères de la commande, on vérifie si ils corespondent bien à une commande valide
-        switch (state){
-            // pour le premier caractère, il peut être soit un espace soit une lettre
-            case S_DEPART:
-                switch (caractereCourant){
-                    case ' ': //si c'est un espace
-                        state = S_DEPART;
-                        break;
-                    case '\0': // normalement pas possible d'en arriver là
-                        state = S_ERREUR;
-                        break;
-                    default: // si ce n'est pas un espace : c'est une lettre ou autre chose
-                        if(isalpha(caractereCourant)){ // si c'est une lettre, on continue
-                            state = S_LETTRE;
-                        }else{ // si ce n'est pas une lettre alors erreur
-                            state = S_ERREUR;
-                        }
-                        break;
-                }
-                break;
-            case S_LETTRE: // pour les premières lettre de la commande
-                switch(caractereCourant){
-                    case ' ':
-                        state = S_ESPACE;
-                        break;
-                    case '\0': // \0 correspond au caractère de fin du tableau (et donc de la commande)
-                        state = S_FINI;
-                        break;
-                    case '&':
-                        state = S_ET_COMMERCIAL;
-                        break;
-                    default:
-                        if(isalpha(caractereCourant)){
-                            state = S_LETTRE;
-                        }else{
-                            state = S_ERREUR;
-                        }
-                        break;
-                }
-                break;
-            case S_ESPACE: // si on tombe sur un espace à l'intérieur de la commande
-                // il peut être suivi de : 
-                switch(caractereCourant){
-                    case ' ': // un autre espace
-                        state = S_ESPACE;
-                        break;
-                    case '-': // un tiret 
-                        state = S_TIRET;
-                        break;
-                    case '\0': // la fin de la commande
-                        state = S_FINI;
-                        break;
-                    case '&':
-                        state = S_ET_COMMERCIAL;
-                        break;
-                    default:
-                        state = S_ERREUR;
-                        break;
-                }
-                break;
-            case S_TIRET: // si on arrive sur un tiret, le caractère suivant peut être uniquement une lettre 
-                if(isalpha(caractereCourant)){
-                    state = S_LETTRE_APRES_TIRET;
-                }else{
-                    state = S_ERREUR;
-                }
-                break;
-            case S_LETTRE_APRES_TIRET:
-                switch(caractereCourant){
-                    case ' ':
-                        state = S_ESPACE;
-                        break;
-                    case '\0':
-                        state = S_FINI;
-                        break;
-                    default:
-                        if(isalpha(caractereCourant)){
-                            state = S_LETTRE_APRES_TIRET;
-                        }else{
-                            state = S_ERREUR;
-                        }
-                        break;
-                }
-                break;
-            case S_ET_COMMERCIAL: // après un & on ne peut trouver que des espaces
-                switch(caractereCourant){
-                    case ' ': // si on a un espace alors on retourne dans cette partie de l'automate jusqu'à arriver à la fin de la commande ou jusqu'à ce qu'on tombe sur un caractère 
-                        state = S_ET_COMMERCIAL;
-                        break;
-                    case '\0':
-                        state = S_FINI;
-                        break;
-                    default: // si on tombe sur autre chose qu'un espace alors il y a une erreur
-                        state = S_ERREUR;
-                        break;
-                }
-        }
-    }
-    if(state == S_ET_COMMERCIAL) return 2; // correspond à une commande à lancer en arrière plan
-
-    if(state == S_ERREUR) return 1; // 1 correspond à une erreur 
-
-    return 0; //réussite
 }
 
 // reussite : 0
@@ -347,29 +258,7 @@ char* recupererPromptCourant() {
                         promptCourant = strdup(heure);
                         break;
                     case 'd': //date de la forme : mer. janv. 17
-                        // variable qui va contenir le nombre de secondes écoulées depuis le 1er janvier 1970
-                        time_t tempsActuel; 
-                        //structure qui permet de stocker des informations sur le temps
-                        struct tm *tempsInfo;
-
-                        //on récupère le nombre de secondes écoulées depuis le 1er janvier 1970
-                        time(&tempsActuel);
-                        //on les convertit pour obtenir des valeurs plus lisibles
-                        tempsInfo = localtime(&tempsActuel);
-
-                        //création du prompt
-                        char date[9];
-                        sprintf(date, "%02d:%02d:%02d", tempsInfo->tm_hour, tempsInfo->tm_min, tempsInfo->tm_sec);
-                        
-                        //on alloue la mémoire nécessaire
-                        promptCourant = malloc(strlen(prompt) + strlen(date) + 4);
-
-                        //on ajojute \0 à la fin du prompt
-                        strncpy(promptCourant, prompt, i);
-                        promptCourant[i] = '\0';
-                        
-                        //on ajoute la date au prompt
-                        promptCourant = strdup(date);
+                        //TODO
                         break;
                     default:
                         //promptCourant = strdup(prompt);
@@ -403,4 +292,50 @@ char* recupererResultatComande(char* commande){
     pclose(fp);
 
     return strdup(res);
+}
+
+
+int main(int argc, char** argv) {
+    historique.count = 0;
+
+
+    printf(R"EOF(
+
+
+               __  ___    ___           __    _  __
+              /  |/  /___/ _ )___ ____ / /   | |/_/
+             / /|_/ /___/ _  / _ `(_-</ _ \  >  <  
+            /_/  /_/   /____/\_,_/___/_//_/ /_/|_| v0.1 
+
+            Par PIERROT Nathan et TROHA Stanislas 
+                                                    
+
+
+)EOF");
+
+    while (1) {
+
+        changerPrompt("\\t"); // juste pour tester
+        char* prompt = recupererPromptCourant();
+        printf("%s", prompt);
+
+        if (fgets(commande, MAXLI, stdin) != NULL) {
+            commande[strcspn(commande, "\n")] = '\0';
+
+            // Si l'utilisateur a entré quelque chose de vide (du style entrée)
+            if (strlen(commande) == 0) {
+                continue; // On recommence la boucle pour lui redemander
+            }
+
+            ajouterHistorique(&historique, commande);
+
+            char* recuperer = recupererCheminCmd();
+            mbash(recuperer);
+            free(recuperer);
+        } else {
+            perror("fgets");
+            exit(EXIT_FAILURE);
+        }
+    }
+    return 0;
 }
