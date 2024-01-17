@@ -14,14 +14,6 @@
 
 char commande[MAXLI];
 
-void mbash(char* recuperer);
-char* recupererCheminCmd();
-int cd(char *nouveauDossier);
-int changerPrompt(char* nouveauPrompt);
-char* recupererPromptCourant();
-int verifierCommande(char *commande);
-char* recupererResultatComande(char* commande);
-
 // On crée une structure qui contiendra le nombre de commandes et les commandes elles-mêmes
 typedef struct{
     char commandes[TAILLEHISTORIQUE][MAXLI];
@@ -189,31 +181,32 @@ char* recupererCheminCmd() {
     return chemin;
 }
 
-// reussite : 0
-// échec : -1
-// méthode qui permet de changer le répertoire courant
-int cd(char *nouveauDossier){
-    // si l'on veut se déplacer dans le home (~) alors il faut associer le ~ au home (applelé expansion)
-    if(nouveauDossier[0]=='~'){
-        //variable temporaire utilisée pour l'assiciation du home
-        wordexp_t tmp;
-        if (wordexp(nouveauDossier, &tmp, 0) == 0) {
-            // variable contenant le résultat de l'expansion, le chemin du home se trouva dans la première case du tableau
-            chdir(tmp.we_wordv[0]);
-            // on libère la mémoire de la variable temporaire et de tout ce qu'elle peut contenir
-            wordfree(&tmp);
-        }
-    }
-    // on change de répertoire
-    int res = chdir(nouveauDossier);
-    return res;
-}
 
 // Méthode qui permet de changer le prompt du terminal
 int changerPrompt(char *nouveauPrompt){
     //on change la variable d'environement qui correspond au PS1
     int res = setenv("PS1", nouveauPrompt, 1);
     return res;
+}
+
+char* recupererResultatComande(char* commande){
+    //on créé un fichier pour stocker le résultat de pwd
+    FILE *fp = popen(commande, "r");
+    
+    //tableau qui va stocker le résultat de la commande
+    char res[1024];
+    if (fgets(res, sizeof(res), fp) == NULL) {
+        perror("fgets dans recupererResultatComande");
+        exit(EXIT_FAILURE);
+    }
+
+    //on enlève le \n de la fin de la ligne pour ne pas retourner à la ligne
+    res[strcspn(res, "\n")] = '\0';
+
+    //on ferme le fichier, on en a plus besoin
+    pclose(fp);
+
+    return strdup(res);
 }
 
 // Méthode qui permet de récupérer le prompt courant pour l'afficher
@@ -272,26 +265,6 @@ char* recupererPromptCourant() {
     }
     strcat(promptCourant, " $ ");
     return promptCourant;
-}
-
-char* recupererResultatComande(char* commande){
-    //on créé un fichier pour stocker le résultat de pwd
-    FILE *fp = popen(commande, "r");
-    
-    //tableau qui va stocker le résultat de la commande
-    char res[1024];
-    if (fgets(res, sizeof(res), fp) == NULL) {
-        perror("fgets dans recupererResultatComande");
-        exit(EXIT_FAILURE);
-    }
-
-    //on enlève le \n de la fin de la ligne pour ne pas retourner à la ligne
-    res[strcspn(res, "\n")] = '\0';
-
-    //on ferme le fichier, on en a plus besoin
-    pclose(fp);
-
-    return strdup(res);
 }
 
 
