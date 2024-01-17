@@ -7,12 +7,42 @@
 #include <ctype.h>
 #include <wordexp.h>
 
+
+#define TAILLEHISTORIQUE 100 // Pour le nombre de commandes que l'historique pourra contenir
 #define MAXLI 2048
 
 char commande[MAXLI];
 
-void mbash(char* recuperer);
-char* recupererCheminCmd();
+
+
+// On crée une structure qui contiendra le nombre de commandes et les commandes elles-mêmes
+typedef struct{
+    char commandes[TAILLEHISTORIQUE][MAXLI];
+    int count;
+} Historique;
+
+// On initialise l'historique pour pouvoir après l'utiliser dans mbash
+Historique historique;
+
+
+void ajouterHistorique(Historique *historique, const char *cmd){
+    if(historique->count < TAILLEHISTORIQUE){ // Si l'historique n'est pas complètement rempli
+        strcpy(historique->commandes[historique->count], cmd);
+        historique->count++;
+    }else{ // Sinon il est plein et il faut décaler les commandes pour supprimer la toute première
+        for(int i = 0; i < TAILLEHISTORIQUE - 1; i++){
+            strcpy(historique->commandes[i], historique->commandes[i+1]);
+        }
+        strcpy(historique->commandes[TAILLEHISTORIQUE - 1], cmd);
+    }
+}
+
+void afficherHistorique(const Historique *historique){
+    for(int i = 0; i < historique->count; i++){
+        printf("%d: %s\n", i + 1, historique->commandes[i]);
+    }
+}
+
 
 
 // reussite : 0
@@ -21,7 +51,6 @@ char* recupererCheminCmd();
 int cd(char *nouveauDossier){
     // si l'on veut se déplacer dans le home (~) alors il faut associer le ~ au home (applelé expansion)
     if(nouveauDossier[0]=='~'){
-        printf("TRIPLE MONSTRE COUCOU \n");
         //variable temporaire utilisée pour l'assiciation du home
         wordexp_t tmp;
         if (wordexp(nouveauDossier, &tmp, 0) == 0) {
@@ -47,7 +76,7 @@ void mbash(char* recuperer) {
     // Si le pid actuel est le pid du processus fils qui vient d'être créé alors le code qui va suivre c'est le processus fils qui va l'exécuter
     if (pid == 0) {
 
-        printf("Chemin de l'exécutable : %s%s", recuperer, "\n");
+        //printf("Chemin de l'exécutable : %s%s", recuperer, "\n");
 
         // On crée le tableau d'arguments pour execve (chemin, arguments, et variables d'environnement) 
         char* args[MAXLI];
@@ -63,10 +92,10 @@ void mbash(char* recuperer) {
         char* env[] = {NULL};
 
         // Affichage de chaque élément du tableau args
-        printf("Contenu de args :\n");
-        for (int j = 0; args[j] != NULL; ++j) {
-            printf("args[%d] = %s\n", j, args[j]);
-        }
+        //printf("Contenu de args :\n");
+        //for (int j = 0; args[j] != NULL; ++j) {
+        //    printf("args[%d] = %s\n", j, args[j]);
+        //}
 
         if(recuperer == NULL){ // Si la commande which n'a rien retourné alors il faut qu'on vérifie le nom de la commande pour voir si elle a été reprogrammée par nos soins
              // Par convention et exigence de execve, le premier élément d'args doit toujours contenir le nom de la commande.
@@ -82,7 +111,11 @@ void mbash(char* recuperer) {
                 } else {
                     fprintf(stderr, "Erreur : Argument manquant pour cd\n");
                 }
-                }
+            }else if(strcmp(args[0], "history") == 0){
+                afficherHistorique(&historique);
+            }else{
+                printf("%s", "Commande à reprogrammer car contenue directement dans Bash ou alors inexistante\n");
+            }
             
         }else{
                 // On enregistre le code de retour de la commande avec execve
@@ -135,9 +168,7 @@ char* recupererCheminCmd() {
 
     } else { // Sinon ça veut dire que ça n'a rien retourné, donc soit que l'utilisateur a entré une commande native à Bash (genre cd etc...) soit une commande qui n'existe pas
         // Pour l'instant on ne traite pas la différence entre les deux cas, on met l'automate d'abord.
-        printf("%s", "Commande à reprogrammer car contenue directement dans Bash ou alors inexistante\n");
         chemin = NULL;
-        // Si 
     }
 
     pclose(fp); // Puis on ferme le flux une fois les opérations terminées
@@ -146,6 +177,8 @@ char* recupererCheminCmd() {
 
 
 int main(int argc, char** argv) {
+    historique.count = 0;
+
 
     printf(R"EOF(
 
@@ -171,6 +204,8 @@ int main(int argc, char** argv) {
             if (strlen(commande) == 0) {
                 continue; // On recommence la boucle pour lui redemander
             }
+
+            ajouterHistorique(&historique, commande);
 
             char* recuperer = recupererCheminCmd();
             mbash(recuperer);
