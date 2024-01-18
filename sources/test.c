@@ -115,7 +115,7 @@ void mbash(char* recuperer) {
 
         if(recuperer == NULL){ // Si la commande which n'a rien retourné alors il faut qu'on vérifie le nom de la commande pour voir si elle a été reprogrammée par nos soins
              // Par convention et exigence de execve, le premier élément d'args doit toujours contenir le nom de la commande.
-                // Donc on a le nom de la commande
+            // Donc on a le nom de la commande
             // Faire un switch est impossible car permet seulement de comparer un caractère à la fois ou des entiers etc... mais pas des chaînes directement
             if(strcmp(args[0], "cd") == 0){
                 int res = cd(args[1]);
@@ -126,11 +126,12 @@ void mbash(char* recuperer) {
             }else if(strcmp(args[0], "history") == 0){
                 afficherHistorique(&historique);
             }else{
+                printf("\033[0;31m");
                 printf("%s", "Commande à reprogrammer car contenue directement dans Bash ou alors inexistante\n");
             }
             
         }else{
-                // On enregistre le code de retour de la commande avec execve
+            // On enregistre le code de retour de la commande avec execve
             int retour = execve(recuperer, args, env);
             if(retour == -1){ // On catch une erreur et on l'affiche
                 perror("execve");
@@ -218,6 +219,8 @@ char* recupererResultatComande(char* commande){
 char* recupererPromptCourant() {
     char* prompt = getenv("PS1");
     char* promptCourant = NULL;
+    //taille max du prompt 
+    promptCourant = malloc(100);
 
     for (int i = 0; prompt[i] != '\0'; i++) {
         if (prompt[i] == '\\') {
@@ -232,31 +235,40 @@ char* recupererPromptCourant() {
                         break;
                     case 't': //heure au format HH:MM:SS
                         // variable qui va contenir le nombre de secondes écoulées depuis le 1er janvier 1970
-                        time_t tempsActuel; 
+                        time_t tempsActuel;
                         //structure qui permet de stocker des informations sur le temps
-                        struct tm *tempsInfo;
+                        struct tm *heureInfo;
 
                         //on récupère le nombre de secondes écoulées depuis le 1er janvier 1970
                         time(&tempsActuel);
                         //on les convertit pour obtenir des valeurs plus lisibles
-                        tempsInfo = localtime(&tempsActuel);
+                        heureInfo = localtime(&tempsActuel);
 
                         //création du prompt
                         char heure[9];
-                        sprintf(heure, "%02d:%02d:%02d", tempsInfo->tm_hour, tempsInfo->tm_min, tempsInfo->tm_sec);
-                        
-                        //on alloue la mémoire nécessaire
-                        promptCourant = malloc(strlen(prompt) + strlen(heure) + 4);
+                        sprintf(heure, "%02d:%02d:%02d", heureInfo->tm_hour, heureInfo->tm_min, heureInfo->tm_sec);
 
-                        //on ajojute \0 à la fin du prompt
-                        strncpy(promptCourant, prompt, i);
-                        promptCourant[i] = '\0';
-                        
                         //on ajoute l'heure au prompt
+                        free(promptCourant);
                         promptCourant = strdup(heure);
                         break;
                     case 'd': //date de la forme : mer. janv. 17
-                        //TODO
+                        // variable qui va contenir le nombre de secondes écoulées depuis le 1er janvier 1970
+                        time_t dateActuelle;
+                        //structure qui permet de stocker des informations sur le temps
+                        struct tm *dateInfo;
+                        //on récupère le nombre de secondes écoulées depuis le 1er janvier 1970
+                        time(&dateActuelle);
+                        //on les convertit pour obtenir des valeurs plus lisibles
+                        dateInfo = localtime(&dateActuelle);
+
+                        //création du prompt
+                        char date[30];
+                        strftime(date, sizeof(date), "%a. %b. %d", dateInfo);
+
+                        //on ajoute la date au prompt
+                        free(promptCourant);
+                        promptCourant = strdup(date);
                         break;
                     default:
                         //promptCourant = strdup(prompt);
@@ -268,6 +280,7 @@ char* recupererPromptCourant() {
             break;
         }
     }
+    //on ajoute $ à la fin du prompt
     strcat(promptCourant, " $ ");
     return promptCourant;
 }
@@ -289,36 +302,42 @@ int main(int argc, char** argv) {
                                                     
 
 
-)EOF");
+    )EOF");
 
     while (1) {
 
-    char* prompt = recupererPromptCourant();
-    // Lire une ligne avec readline
-    char *input = readline("CMD : ");
+        changerPrompt("\\d");
+        char* prompt = recupererPromptCourant();
+        
+        //couleur du prompt
+        printf("\033[0;35m");
+        printf("%s", prompt);
+        printf("\033[0;37m");
+        // Lire une ligne avec readline
+        char *input = readline("");
 
+        if (!input) {
+            // Gestion de la fin du fichier ou de l'erreur de lecture
+            break;
+        }
 
-    if (!input) {
-        // Gestion de la fin du fichier ou de l'erreur de lecture
-        break;
+        if (input[0] != '\0') {
+            // Ajouter la ligne à l'historique seulement si elle n'est pas vide
+            add_history(input);
+            ajouterHistorique(&historique, input);
+            strcpy(commande, input);
+        }
+
+        if(strcmp(input, "exit") == 0){
+            printf("\033[0;32m");
+            printf("Merci d'avoir utilisé Mbash\n");
+            exit(0);
+        }
+
+        mbash(recupererCheminCmd());
+
+        free(input);
     }
-
-    if (input[0] != '\0') {
-        // Ajouter la ligne à l'historique seulement si elle n'est pas vide
-        add_history(input);
-        ajouterHistorique(&historique, input);
-        strcpy(commande, input);
-    }
-
-    if(strcmp(input, "exit") == 0){
-        printf("Merci d'avoir utilisé Mbash");
-        exit(0);
-    }
-
-    mbash(recupererCheminCmd());
-
-    free(input);
-}
 
     return 0;
 }
