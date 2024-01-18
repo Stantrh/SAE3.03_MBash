@@ -164,7 +164,7 @@ void mbash(char* recuperer) {
             }else if(strcmp(args[0], "history") == 0){
                 afficherHistorique(&historique);
             }else if (strcmp(args[0], "cdd") == 0) {
-                const char *imagePath = "test.gif";
+                const char *imagePath = "lol.gif";
 
                 while (continuerBoucle) {  // On continue la boucle tant que continuerBoucle vaut 1 
                     // Code Chafa pour générer l'image
@@ -188,7 +188,10 @@ void mbash(char* recuperer) {
                     pclose(chafaOutput);
 
                 }
-            }else{
+            }else if(strcmp(args[0], "cls") == 0){
+                clearConsole();
+            }
+            else{
                 printf("%s", "Commande à reprogrammer car contenue directement dans Bash ou alors inexistante\n");
             }
             
