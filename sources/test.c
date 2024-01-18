@@ -10,6 +10,12 @@
 #include <limits.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <math.h>
+#include <signal.h>
+
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #define TAILLEHISTORIQUE 100 // Pour le nombre de commandes que l'historique pourra contenir
 #define MAXLI 2048
@@ -25,6 +31,12 @@ typedef struct{
 // On initialise l'historique pour pouvoir après l'utiliser dans mbash
 Historique historique;
 
+/**
+ * Méthode simple pour effacer tout ce qu'il y a dans la console
+ **/
+void clearConsole() {
+    printf("\033[H\033[J");
+}
 
 void ajouterHistorique(Historique *historique, const char *cmd){
     if(historique->count < TAILLEHISTORIQUE){ // Si l'historique n'est pas complètement rempli
@@ -82,7 +94,25 @@ int cd(char *nouveauDossier) {
     }
 }
 
+// Permet d'indiquer si on continue la boucle ou pas (nécessite 2 CTRL + C pour arrêter tout le programme)
+int continuerBoucle = 1;
+
+// Avec ça on peut gérer l'interruption soit de la boucle soit du programme complet
+void gestionnaireSignal(int signal) {
+    if (signal == SIGINT) {
+        if (continuerBoucle) {
+            continuerBoucle = 0; // Permet d'arrêter la boucle
+        } else {
+            exit(EXIT_SUCCESS);
+        }
+    }
+}
+
+
 void mbash(char* recuperer) {
+    // On associe à SIGINT la fonction qui gère les CTRL + C
+    signal(SIGINT, gestionnaireSignal);
+
     // On crée un nouveau processus
     pid_t pid = fork();
 
@@ -125,6 +155,31 @@ void mbash(char* recuperer) {
                 
             }else if(strcmp(args[0], "history") == 0){
                 afficherHistorique(&historique);
+            }else if (strcmp(args[0], "cdd") == 0) {
+                const char *imagePath = "test.gif";
+
+                while (continuerBoucle) {  // On continue la boucle tant que continuerBoucle vaut 1 
+                    // Code Chafa pour générer l'image
+                    char chafaCommand[100];
+                    sprintf(chafaCommand, "chafa %s", imagePath);
+
+                    // Exécution de la commande avec lecture
+                    FILE *chafaOutput = popen(chafaCommand, "r");
+                    if (chafaOutput == NULL) {
+                        perror("Erreur lors de l'exécution de Chafa");
+                        exit(EXIT_FAILURE);
+                    }
+
+                    // Et on redirige ça dans le terminal
+                    char buffer[256];
+                    while (fgets(buffer, sizeof(buffer), chafaOutput) != NULL) {
+                        printf("%s", buffer);
+                    }
+
+                    // Fermeture du fichier de sortie de Chafa
+                    pclose(chafaOutput);
+
+                }
             }else{
                 printf("\033[0;31m");
                 printf("%s", "Commande à reprogrammer car contenue directement dans Bash ou alors inexistante\n");
@@ -149,6 +204,8 @@ void mbash(char* recuperer) {
         exit(EXIT_FAILURE); // On termine le processus actuel
     }
 }
+
+
 
 /**
  * Méthode qui renvoie la commande permettant de récupérer le chemin d'un programme
@@ -289,6 +346,7 @@ char* recupererPromptCourant() {
 int main(int argc, char** argv) {
     historique.count = 0;
 
+    clearConsole();
 
     printf(R"EOF(
 
