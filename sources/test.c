@@ -27,7 +27,7 @@ char commande[MAXLI];
 // On crée une structure qui contiendra le nombre de commandes et les commandes elles-mêmes
 typedef struct{
     char commandes[TAILLEHISTORIQUE][MAXLI];
-    int count;
+    int count;  
 } Historique;
 
 // On initialise l'historique pour pouvoir après l'utiliser dans mbash
@@ -115,98 +115,97 @@ void mbash(char* recuperer) {
     // On associe à SIGINT la fonction qui gère les CTRL + C
     signal(SIGINT, gestionnaireSignal);
 
-    // On crée un nouveau processus
-    pid_t pid = fork();
+
+    // printf("Chemin de l'exécutable : %s%s", recuperer, "\n");
+
+    // On crée le tableau d'arguments pour execve (chemin, arguments, et variables d'environnement) 
+    char* args[MAXLI];
+    char* token = strtok(commande, " "); // On sépare la commande en parties séparées par les espaces
+    int i = 0;
 
 
-    // Si le pid actuel est le pid du processus fils qui vient d'être créé alors le code qui va suivre c'est le processus fils qui va l'exécuter
-    if (pid == 0) {
-
-        // printf("Chemin de l'exécutable : %s%s", recuperer, "\n");
-
-        // On crée le tableau d'arguments pour execve (chemin, arguments, et variables d'environnement) 
-        char* args[MAXLI];
-        char* token = strtok(commande, " "); // On sépare la commande en parties séparées par les espaces
-        int i = 0;
+    while (token != NULL) { // Puis chaque partie séparée par un espace correspond à un argument
+        args[i++] = token;
+        token = strtok(NULL, " ");
+    }
 
 
-        while (token != NULL) { // Puis chaque partie séparée par un espace correspond à un argument
-            args[i++] = token;
-            token = strtok(NULL, " ");
-        }
+    args[i] = NULL; // Dernier élément du tableau doit être NULLS
+    char* env[] = {NULL};
 
+    // Affichage de chaque élément du tableau args
+    //printf("Contenu de args :\n");
+    //for (int j = 0; args[j] != NULL; ++j) {
+    //    printf("args[%d] = %s\n", j, args[j]);
+    //}
 
-        args[i] = NULL; // Dernier élément du tableau doit être NULLS
-        char* env[] = {NULL};
-
-        // Affichage de chaque élément du tableau args
-        //printf("Contenu de args :\n");
-        //for (int j = 0; args[j] != NULL; ++j) {
-        //    printf("args[%d] = %s\n", j, args[j]);
-        //}
-
-        if(recuperer == NULL){ // Si la commande which n'a rien retourné alors il faut qu'on vérifie le nom de la commande pour voir si elle a été reprogrammée par nos soins
-            // Par convention et exigence de execve, le premier élément d'args doit toujours contenir le nom de la commande.
-            // Donc on a le nom de la commande
-            // Faire un switch est impossible car permet seulement de comparer un caractère à la fois ou des entiers etc... mais pas des chaînes directement
-            if(strcmp(args[0], "cd") == 0){
-                int res = cd(args[1]);
-                if (res == -1) {
-                    fprintf(stderr, "Erreur lors de l'exécution de la commande cd\n");
-                }
-                
-            }else if(strcmp(args[0], "history") == 0){
-                afficherHistorique(&historique);
-            }else if (strcmp(args[0], "cdd") == 0) {
-                const char *imagePath = "g3Ah.gif";
-
-                while (continuerBoucle) {  // On continue la boucle tant que continuerBoucle vaut 1 
-                    // Code Chafa pour générer l'image
-                    char chafaCommand[100];
-                    sprintf(chafaCommand, "chafa %s", imagePath);
-
-                    // Exécution de la commande avec lecture
-                    FILE *chafaOutput = popen(chafaCommand, "r");
-                    if (chafaOutput == NULL) {
-                        perror("Erreur lors de l'exécution de Chafa");
-                        exit(EXIT_FAILURE);
-                    }
-
-                    // Et on redirige ça dans le terminal
-                    char buffer[256];
-                    while (fgets(buffer, sizeof(buffer), chafaOutput) != NULL) {
-                        printf("%s", buffer);
-                    }
-
-                    // Fermeture du fichier de sortie de Chafa
-                    pclose(chafaOutput);
-
-                }
-            }else if (args[i-1] == "&"){ // si le dernier élément dans le tableau (sans compter le \0) est un &
-                printf("%s", "test");
-                //pid_t pid = fork();
-            }else{
-                printf("\033[0;31m");
-                printf("%s", "Commande à reprogrammer car contenue directement dans Bash ou alors inexistante\n");
+    if(recuperer == NULL){ // Si la commande which n'a rien retourné alors Sil faut qu'on vérifie le nom de la commande pour voir si elle a été reprogrammée par nos soins
+         // Par convention et exigence de execve, le premier élément d'args doit toujours contenir le nom de la commande.
+        // Donc on a le nom de la commande
+        // Faire un switch est impossible car permet seulement de comparer un caractère à la fois ou des entiers etc... mais pas des chaînes directement
+        if(strcmp(args[0], "cd") == 0){
+            int res = cd(args[1]);
+            if (res == -1) {
+                fprintf(stderr, "Erreur lors de l'exécution de la commande cd\n");
             }
             
+        }else if(strcmp(args[0], "history") == 0){
+            afficherHistorique(&historique);
+        }else if (strcmp(args[0], "cdd") == 0) {
+            const char *imagePath = "lol.gif";
+
+            while (continuerBoucle) {  // On continue la boucle tant que continuerBoucle vaut 1 
+                // Code Chafa pour générer l'image
+                char chafaCommand[100];
+                sprintf(chafaCommand, "chafa %s", imagePath);
+
+                // Exécution de la commande avec lecture
+                FILE *chafaOutput = popen(chafaCommand, "r");
+                if (chafaOutput == NULL) {
+                    perror("Erreur lors de l'exécution de Chafa");
+                    exit(EXIT_FAILURE);
+                }
+
+                // Et on redirige ça dans le terminal
+                char buffer[256];
+                while (fgets(buffer, sizeof(buffer), chafaOutput) != NULL) {
+                    printf("%s", buffer);
+                }
+
+                // Fermeture du fichier de sortie de Chafa
+                pclose(chafaOutput);
+
+            }
+        }else if(strcmp(args[0], "cls") == 0){
+            clearConsole();
         }else{
+            printf("\033[0;31m");
+            printf("%s", "Commande à reprogrammer car contenue directement dans Bash ou alors inexistante\n");
+        }
+        
+    }else{
+        // On crée un nouveau processus
+        pid_t pid = fork();
+
+        // Si c'est le processus fils qui exécute le code
+        if(pid == 0){
             // On enregistre le code de retour de la commande avec execve
             int retour = execve(recuperer, args, env);
             if(retour == -1){ // On catch une erreur et on l'affiche
                 perror("execve");
                 exit(EXIT_FAILURE); // On termine le processus fils
             }
+        }else if(pid > 0){
+            // Vérifier si y a & dans la commmande
+            // Si oui, alors pas de wait pid
+            // si non, wait pd
+            if(1){
+                waitpid(pid, NULL, 0); // Donc il faut attendre que son processus fils se finisse
+            }
+        } else { // Si le fork n'a pas fonctionné on met l'erreur, (pas assez de mémoire par exemple)
+            perror("fork");
+            exit(EXIT_FAILURE); // On termine le processus actuel
         }
-
-
-
-        
-    } else if (pid > 0) { // Si le pid est supérieur à 0 alors c'est encore le processus parent
-        waitpid(pid, NULL, 0); // Donc il faut attendre que son processus fils se finisse
-    } else { // Si le fork n'a pas fonctionné on met l'erreur (pas assez de mémoire par exemple)
-        perror("fork");
-        exit(EXIT_FAILURE); // On termine le processus actuel
     }
 }
 
@@ -351,10 +350,15 @@ char* recupererPromptCourant() {
 }
 
 
+
 int main(int argc, char** argv) {
     historique.count = 0;
 
+
+
     clearConsole();
+    printf("PID PARENT : %d\n", getpid());
+
 
     printf(R"EOF(
 
@@ -371,6 +375,7 @@ int main(int argc, char** argv) {
 )EOF");
 
     while (1) {
+
 
         changerPrompt("\\u \\u");
         char* prompt = recupererPromptCourant();
@@ -395,12 +400,15 @@ int main(int argc, char** argv) {
             add_history(input);
             ajouterHistorique(&historique, input);
             strcpy(commande, input);
+        }else{
+            continue;
         }
 
         if(strcmp(input, "exit") == 0){
             printf("\033[0;32m");
             printf("Merci d'avoir utilisé Mbash\n");
-            exit(0);
+            printf("PID : %d\n", getpid());
+            exit(EXIT_SUCCESS);
         }
 
         mbash(recupererCheminCmd());
