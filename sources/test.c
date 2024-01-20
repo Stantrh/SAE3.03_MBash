@@ -1,3 +1,5 @@
+//commande pour compiler : gcc -o mbash mbash.c -lreadline -lhistory
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -137,7 +139,7 @@ void mbash(char* recuperer) {
     //    printf("args[%d] = %s\n", j, args[j]);
     //}
 
-    if(recuperer == NULL){ // Si la commande which n'a rien retourné alors il faut qu'on vérifie le nom de la commande pour voir si elle a été reprogrammée par nos soins
+    if(recuperer == NULL){ // Si la commande which n'a rien retourné alors Sil faut qu'on vérifie le nom de la commande pour voir si elle a été reprogrammée par nos soins
          // Par convention et exigence de execve, le premier élément d'args doit toujours contenir le nom de la commande.
         // Donc on a le nom de la commande
         // Faire un switch est impossible car permet seulement de comparer un caractère à la fois ou des entiers etc... mais pas des chaînes directement
@@ -204,7 +206,6 @@ void mbash(char* recuperer) {
             perror("fork");
             exit(EXIT_FAILURE); // On termine le processus actuel
         }
-        
     }
 }
 
@@ -275,71 +276,74 @@ char* recupererResultatComande(char* commande){
     return strdup(res);
 }
 
+char* informationsTemps(char unite){
+    // variable qui va contenir le nombre de secondes écoulées depuis le 1er janvier 1970
+    time_t tempsActuel;
+    //structure qui permet de stocker des informations sur le temps
+    struct tm *tempsInfo;
+
+    //on récupère le nombre de secondes écoulées depuis le 1er janvier 1970
+    time(&tempsActuel);
+    //on les convertit pour obtenir des valeurs plus lisibles
+    tempsInfo = localtime(&tempsActuel);
+
+    //création du prompt
+    char temps[40];
+
+    if(unite == 'd'){//date de la forme : mer. janv. 17
+        strftime(temps, sizeof(temps), "%a. %b. %d", tempsInfo);
+        //on ajoute la date au prompt
+        return strdup(temps);
+    }else if(unite == 't'){ //heure au format HH:MM:SS
+        sprintf(temps, "%02d:%02d:%02d", tempsInfo->tm_hour, tempsInfo->tm_min, tempsInfo->tm_sec);
+        return strdup(temps);
+    }
+    
+    return "error";
+}
+
 // Méthode qui permet de récupérer le prompt courant pour l'afficher
 char* recupererPromptCourant() {
-    char* prompt = getenv("PS1");
-    char* promptCourant = NULL;
-    //taille max du prompt 
-    promptCourant = malloc(100);
+    char* prompt = malloc(strlen(getenv("PS1")+10));
+    prompt = getenv("PS1");
 
+    //taille max du prompt
+    char* promptCourant = malloc(100);
+    
     for (int i = 0; prompt[i] != '\0'; i++) {
         if (prompt[i] == '\\') {
             i++;
             if (prompt[i] != '\0') {
                 switch (prompt[i]) {
                     case 'w': //chemin absolut du répertoire courant
-                        promptCourant = recupererResultatComande("pwd");
+                        //strcat(promptCourant, recupererResultatComande("pwd")); //ça pose des problèmes
+                        sprintf(promptCourant, "%s%s", promptCourant, recupererResultatComande("pwd"));
+                        //promptCourant = recupererResultatComande("pwd");
                         break;
                     case 'u': //nom de l'utilisateur actuel
-                        promptCourant = recupererResultatComande("whoami");
+                        //strcat(promptCourant, recupererResultatComande("whoami")); //ça pose des problèmes
+                        sprintf(promptCourant, "%s%s", promptCourant, recupererResultatComande("whoami"));
+                        //promptCourant = recupererResultatComande("whoami");
                         break;
                     case 't': //heure au format HH:MM:SS
-                        // variable qui va contenir le nombre de secondes écoulées depuis le 1er janvier 1970
-                        time_t tempsActuel;
-                        //structure qui permet de stocker des informations sur le temps
-                        struct tm *heureInfo;
-
-                        //on récupère le nombre de secondes écoulées depuis le 1er janvier 1970
-                        time(&tempsActuel);
-                        //on les convertit pour obtenir des valeurs plus lisibles
-                        heureInfo = localtime(&tempsActuel);
-
-                        //création du prompt
-                        char heure[9];
-                        sprintf(heure, "%02d:%02d:%02d", heureInfo->tm_hour, heureInfo->tm_min, heureInfo->tm_sec);
-
-                        //on ajoute l'heure au prompt
-                        free(promptCourant);
-                        promptCourant = strdup(heure);
+                        sprintf(promptCourant, "%s%s", promptCourant, informationsTemps('t'));
                         break;
                     case 'd': //date de la forme : mer. janv. 17
-                        // variable qui va contenir le nombre de secondes écoulées depuis le 1er janvier 1970
-                        time_t dateActuelle;
-                        //structure qui permet de stocker des informations sur le temps
-                        struct tm *dateInfo;
-                        //on récupère le nombre de secondes écoulées depuis le 1er janvier 1970
-                        time(&dateActuelle);
-                        //on les convertit pour obtenir des valeurs plus lisibles
-                        dateInfo = localtime(&dateActuelle);
-
-                        //création du prompt
-                        char date[30];
-                        strftime(date, sizeof(date), "%a. %b. %d", dateInfo);
-
-                        //on ajoute la date au prompt
-                        free(promptCourant);
-                        promptCourant = strdup(date);
+                        sprintf(promptCourant, "%s%s", promptCourant, informationsTemps('d'));
                         break;
                     default:
-                        //promptCourant = strdup(prompt);
+                        promptCourant = strdup(prompt);
                         break;
                 }
             } else if (prompt[i] == '\0') {
                 promptCourant = strdup(">");
             }
-            break;
+        }else{
+            //sprintf(promptCourant, "%c", promptCourant, prompt[i]);
+            strncat(promptCourant, &prompt[i], 1);
         }
     }
+ 
     //on ajoute $ à la fin du prompt
     strcat(promptCourant, " $ ");
     return promptCourant;
@@ -372,7 +376,8 @@ int main(int argc, char** argv) {
 
     while (1) {
 
-        changerPrompt("\\u");
+
+        changerPrompt("\\u \\u");
         char* prompt = recupererPromptCourant();
         
         // on alloue de la mémoire pour le nouveau prompt
