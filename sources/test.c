@@ -22,6 +22,9 @@
 #define TAILLEHISTORIQUE 100 // Pour le nombre de commandes que l'historique pourra contenir
 #define MAXLI 2048
 
+char* verifierPS1EtRetournerValeur(char *commande);
+int changerPrompt(char *nouveauPrompt);
+
 char commande[MAXLI];
 
 // On crée une structure qui contiendra le nombre de commandes et les commandes elles-mêmes
@@ -118,95 +121,104 @@ void mbash(char* recuperer) {
 
     // printf("Chemin de l'exécutable : %s%s", recuperer, "\n");
 
-    // On crée le tableau d'arguments pour execve (chemin, arguments, et variables d'environnement) 
-    char* args[MAXLI];
-    char* token = strtok(commande, " "); // On sépare la commande en parties séparées par les espaces
-    int i = 0;
+    // si on rentre dans le if c'est que l'utilisateur veut changer la variable PS1
+    if(strcmp(verifierPS1EtRetournerValeur(commande), "pasUneCommandePourChangerLePS1") == 0){
+        // On crée le tableau d'arguments pour execve (chemin, arguments, et variables d'environnement) 
+        char* args[MAXLI];
+        char* token = strtok(commande, " "); // On sépare la commande en parties séparées par les espaces
+        int i = 0;
 
 
-    while (token != NULL) { // Puis chaque partie séparée par un espace correspond à un argument
-        args[i++] = token;
-        token = strtok(NULL, " ");
-    }
+        while (token != NULL) { // Puis chaque partie séparée par un espace correspond à un argument
+            args[i++] = token;
+            token = strtok(NULL, " ");
+        }
 
 
-    args[i] = NULL; // Dernier élément du tableau doit être NULLS
-    char* env[] = {NULL};
+        args[i] = NULL; // Dernier élément du tableau doit être NULLS
+        char* env[] = {NULL};
 
-    // Affichage de chaque élément du tableau args
-    //printf("Contenu de args :\n");
-    //for (int j = 0; args[j] != NULL; ++j) {
-    //    printf("args[%d] = %s\n", j, args[j]);
-    //}
+        // Affichage de chaque élément du tableau args
+        //printf("Contenu de args :\n");
+        //for (int j = 0; args[j] != NULL; ++j) {
+        //    printf("args[%d] = %s\n", j, args[j]);
+        //}
 
-    if(recuperer == NULL){ // Si la commande which n'a rien retourné alors Sil faut qu'on vérifie le nom de la commande pour voir si elle a été reprogrammée par nos soins
-         // Par convention et exigence de execve, le premier élément d'args doit toujours contenir le nom de la commande.
-        // Donc on a le nom de la commande
-        // Faire un switch est impossible car permet seulement de comparer un caractère à la fois ou des entiers etc... mais pas des chaînes directement
-        if(strcmp(args[0], "cd") == 0){
-            int res = cd(args[1]);
-            if (res == -1) {
-                fprintf(stderr, "Erreur lors de l'exécution de la commande cd\n");
+        if(recuperer == NULL){ // Si la commande which n'a rien retourné alors Sil faut qu'on vérifie le nom de la commande pour voir si elle a été reprogrammée par nos soins
+            // Par convention et exigence de execve, le premier élément d'args doit toujours contenir le nom de la commande.
+            // Donc on a le nom de la commande
+            // Faire un switch est impossible car permet seulement de comparer un caractère à la fois ou des entiers etc... mais pas des chaînes directement
+            if(strcmp(args[0], "cd") == 0){
+                int res = cd(args[1]);
+                if (res == -1) {
+                    fprintf(stderr, "Erreur lors de l'exécution de la commande cd\n");
+                }
+                
+            }else if(strcmp(args[0], "history") == 0){
+                afficherHistorique(&historique);
+            }else if (strcmp(args[0], "cdd") == 0) {
+                const char *imagePath = "lol.gif";
+
+                while (continuerBoucle) {  // On continue la boucle tant que continuerBoucle vaut 1 
+                    // Code Chafa pour générer l'image
+                    char chafaCommand[100];
+                    sprintf(chafaCommand, "chafa %s", imagePath);
+
+                    // Exécution de la commande avec lecture
+                    FILE *chafaOutput = popen(chafaCommand, "r");
+                    if (chafaOutput == NULL) {
+                        perror("Erreur lors de l'exécution de Chafa");
+                        exit(EXIT_FAILURE);
+                    }
+
+                    // Et on redirige ça dans le terminal
+                    char buffer[256];
+                    while (fgets(buffer, sizeof(buffer), chafaOutput) != NULL) {
+                        printf("%s", buffer);
+                    }
+
+                    // Fermeture du fichier de sortie de Chafa
+                    pclose(chafaOutput);
+
+                }
+            }else if(strcmp(args[0], "cls") == 0){
+                clearConsole();
+            }else{
+                printf("\033[0;31m");
+                printf("%s", "Commande à reprogrammer car contenue directement dans Bash ou alors inexistante\n");
             }
             
-        }else if(strcmp(args[0], "history") == 0){
-            afficherHistorique(&historique);
-        }else if (strcmp(args[0], "cdd") == 0) {
-            const char *imagePath = "lol.gif";
-
-            while (continuerBoucle) {  // On continue la boucle tant que continuerBoucle vaut 1 
-                // Code Chafa pour générer l'image
-                char chafaCommand[100];
-                sprintf(chafaCommand, "chafa %s", imagePath);
-
-                // Exécution de la commande avec lecture
-                FILE *chafaOutput = popen(chafaCommand, "r");
-                if (chafaOutput == NULL) {
-                    perror("Erreur lors de l'exécution de Chafa");
-                    exit(EXIT_FAILURE);
-                }
-
-                // Et on redirige ça dans le terminal
-                char buffer[256];
-                while (fgets(buffer, sizeof(buffer), chafaOutput) != NULL) {
-                    printf("%s", buffer);
-                }
-
-                // Fermeture du fichier de sortie de Chafa
-                pclose(chafaOutput);
-
-            }
-        }else if(strcmp(args[0], "cls") == 0){
-            clearConsole();
         }else{
-            printf("\033[0;31m");
-            printf("%s", "Commande à reprogrammer car contenue directement dans Bash ou alors inexistante\n");
-        }
-        
-    }else{
-        // On crée un nouveau processus
-        pid_t pid = fork();
+            // On crée un nouveau processus
+            pid_t pid = fork();
 
-        // Si c'est le processus fils qui exécute le code
-        if(pid == 0){
-            // On enregistre le code de retour de la commande avec execve
-            int retour = execve(recuperer, args, env);
-            if(retour == -1){ // On catch une erreur et on l'affiche
-                perror("execve");
-                exit(EXIT_FAILURE); // On termine le processus fils
+            // Si c'est le processus fils qui exécute le code
+            if(pid == 0){
+                // On enregistre le code de retour de la commande avec execve
+                int retour = execve(recuperer, args, env);
+                if(retour == -1){ // On catch une erreur et on l'affiche
+                    perror("execve");
+                    exit(EXIT_FAILURE); // On termine le processus fils
+                }
+            }else if(pid > 0){
+                // Vérifier si y a & dans la commmande
+                // Si oui, alors pas de wait pid
+                // si non, wait pd
+                if(1){
+                    waitpid(pid, NULL, 0); // Donc il faut attendre que son processus fils se finisse
+                }
+            } else { // Si le fork n'a pas fonctionné on met l'erreur, (pas assez de mémoire par exemple)
+                perror("fork");
+                exit(EXIT_FAILURE); // On termine le processus actuel
             }
-        }else if(pid > 0){
-            // Vérifier si y a & dans la commmande
-            // Si oui, alors pas de wait pid
-            // si non, wait pd
-            if(1){
-                waitpid(pid, NULL, 0); // Donc il faut attendre que son processus fils se finisse
-            }
-        } else { // Si le fork n'a pas fonctionné on met l'erreur, (pas assez de mémoire par exemple)
-            perror("fork");
-            exit(EXIT_FAILURE); // On termine le processus actuel
         }
+    }else{
+        char* valeurPS1 = malloc(strlen(commande) + 1);
+        valeurPS1 = verifierPS1EtRetournerValeur(commande);
+        changerPrompt(valeurPS1);
     }
+
+    
 }
 
 
@@ -308,7 +320,7 @@ char* recupererPromptCourant() {
     prompt = getenv("PS1");
 
     //taille max du prompt
-    char* promptCourant = malloc(100);
+    char* promptCourant = malloc(256);
     
     for (int i = 0; prompt[i] != '\0'; i++) {
         if (prompt[i] == '\\') {
@@ -331,6 +343,9 @@ char* recupererPromptCourant() {
                     case 'd': //date de la forme : mer. janv. 17
                         sprintf(promptCourant, "%s%s", promptCourant, informationsTemps('d'));
                         break;
+                    case '\\':
+                        sprintf(promptCourant, "%s%s", promptCourant, "\\");
+                        break;
                     default:
                         promptCourant = strdup(prompt);
                         break;
@@ -343,13 +358,143 @@ char* recupererPromptCourant() {
             strncat(promptCourant, &prompt[i], 1);
         }
     }
- 
-    //on ajoute $ à la fin du prompt
-    strcat(promptCourant, " $ ");
     return promptCourant;
 }
 
+// méthode qui permet de vérifier si une commande PS1 est valide et qui retourne la valeur du PS1
+char* verifierPS1EtRetournerValeur(char *commande) {
+    #define S_DEPART                    1
+    #define S_LETTRE_P                  2
+    #define S_LETTRE_S                  3
+    #define S_CHIFFRE_1                 4
+    #define S_EGAL                      5
+    #define S_LETTRE_APRES_EGAL         6
+    #define S_DEBUT_DBQUOTE             7
+    #define S_LETTRE_APRES_DBQUOTE      8
+    #define S_FIN_DBQUOTE               9
+    #define S_FINI                      10
+    #define S_ERREUR                    11
 
+    // état de départ
+    int state = S_DEPART;
+    // compteur pour parcourir tous les caractères de la commande
+    int indice = 0;
+
+    // valeur du PS1
+    char *ps1 = strdup("");
+
+    // on parcourt toute la commande qui est à vérifier, jusqu'à ce qu'on arrive à la fin ou qu'on tombe sur une erreur 
+    while(state < S_FINI){
+        // on récupère le premier caractère de la commande
+        char caractereCourant = commande[indice];
+        // on incrémente le compteur pour la vérification du prochain caractère de la commande
+        indice += 1;
+        // pour tous les caractères de la commande, on vérifie s'ils correspondent bien à une commande valide
+        switch (state){
+            case S_DEPART:
+                switch (caractereCourant){
+                    case 'P':
+                        state = S_LETTRE_P;
+                        break;
+                    case ' ':
+                        state = S_DEPART;
+                    default:
+                        state = S_ERREUR;
+                        break;
+                }
+                break;
+            case S_LETTRE_P:
+                switch(caractereCourant){
+                    case 'S':
+                        state = S_LETTRE_S;
+                        break;
+                    default: 
+                        state = S_ERREUR;
+                        break;
+                }
+                break;
+            case S_LETTRE_S:
+                switch(caractereCourant){
+                    case '1':
+                        state = S_CHIFFRE_1;
+                        break;
+                    default:
+                        state = S_ERREUR;
+                        break;
+                }
+                break;
+            case S_CHIFFRE_1:
+                switch(caractereCourant){
+                    case '=':
+                        state = S_EGAL;
+                        break;
+                    default:
+                        state = S_ERREUR;
+                        break;
+                }
+                break;
+            case S_EGAL:
+                switch(caractereCourant){
+                    case '"':
+                        state = S_DEBUT_DBQUOTE;
+                        break;
+                    default:
+                        strncat(ps1, &caractereCourant, 1);
+                        state = S_LETTRE_APRES_EGAL;
+                        break;
+                }
+                break;
+            case S_LETTRE_APRES_EGAL:
+                switch(caractereCourant){
+                    case '\0':
+                        state = S_FINI;
+                        break;
+                    default:
+                        strncat(ps1, &caractereCourant, 1);
+                        state = S_LETTRE_APRES_EGAL;
+                        break;
+                }
+                break;
+            case S_DEBUT_DBQUOTE:
+                switch(caractereCourant){
+                    case '"':
+                        state = S_FINI;
+                        break;
+                    case '\0':
+                        state = S_ERREUR;
+                        break;
+                    default:
+                        strncat(ps1, &caractereCourant, 1);
+                        state = S_LETTRE_APRES_DBQUOTE;
+                        break;
+                }
+                break;
+            case S_LETTRE_APRES_DBQUOTE:
+                switch(caractereCourant){
+                    case '"':
+                        state = S_FINI;
+                        break;
+                    case '\0':
+                        state = S_ERREUR;
+                        break;
+                    default:
+                        strncat(ps1, &caractereCourant, 1);
+                        state = S_LETTRE_APRES_DBQUOTE;
+                        break;
+                }
+                break;
+        }
+    }
+
+    // Vous n'avez pas besoin de realloc ici, strdup alloue déjà suffisamment d'espace.
+    if(state == S_ERREUR){
+        free(ps1); // Libérez la mémoire allouée pour ps1 en cas d'erreur
+        return "pasUneCommandePourChangerLePS1"; // 1 correspond à une erreur 
+    }
+
+    // réussite
+    return ps1;
+}
 
 int main(int argc, char** argv) {
     historique.count = 0;
@@ -358,6 +503,7 @@ int main(int argc, char** argv) {
 
     clearConsole();
     printf("PID PARENT : %d\n", getpid());
+    changerPrompt("\\u $ ");
 
 
     printf(R"EOF(
@@ -377,7 +523,7 @@ int main(int argc, char** argv) {
     while (1) {
 
 
-        changerPrompt("\\u \\u");
+        
         char* prompt = recupererPromptCourant();
         
         // on alloue de la mémoire pour le nouveau prompt
