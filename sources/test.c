@@ -215,7 +215,32 @@ void mbash(char* recuperer) {
                 printf("%d\n", pidParent);
                 codeRetourGlobal = 0;
             }else if(strcmp(args[0], "help")== 0) {
-                
+                printf(R"EOF(───────────────────────────────────────
+Commandes Disponibles:
+───────────────────────────────────────
+
+- help                : Retourne la liste des commandes disponibles
+- cd                  : Permet à l'utilisateur de se déplacer parmi ses répertoires et fichiers
+- history             : Accède à l'historique des commandes
+- PS1="\u@\w $"       : Personnalise le prompt avec des options telles que :
+    - \u : Nom de l'utilisateur de la session Linux courante
+    - \w : Répertoire courant de l'utilisateur
+    - \t : Heure au format : heures:minutes:secondes
+    - \d : Date au format : Nom du jour. Mois. Numéro du jour
+- cdd                 : Commande secrète - du style "sl" quand on se trompe pour écrire "ls"
+- $$                  : Retourne l'identifiant du processus en cours
+- $?                  : Retourne le code d'exécution de la dernière commande
+- cls                 : Nettoie la console
+- exit                : Ferme le programme
+- commande &          : Lance la commande en arrière-plan
+- CTRL + R            : Ouvre la recherche dans l'historique
+- Flèches (haut/bas)  : Navigue dans l'historique des commandes
+- Tabulation          : Auto-complétion
+- CTRL + C / CTRL + D : Permet de sortir du programme
+
+───────────────────────────────────────
+)EOF");
+                codeRetourGlobal = 0;
             }else{
                 codeRetourGlobal = 127;
                 printf("\033[0;31m");
@@ -325,8 +350,8 @@ int changerPrompt(char *nouveauPrompt){
     return res;
 }
 
+//Méthode qui permet de d'xecuter une commande et de renvoyer son résultat
 char* recupererResultatComande(char* commande){
-    //on créé un fichier pour stocker le résultat de pwd
     FILE *fp = popen(commande, "r");
     
     //tableau qui va stocker le résultat de la commande
@@ -339,12 +364,14 @@ char* recupererResultatComande(char* commande){
     //on enlève le \n de la fin de la ligne pour ne pas retourner à la ligne
     res[strcspn(res, "\n")] = '\0';
 
-    //on ferme le fichier, on en a plus besoin
     pclose(fp);
 
     return strdup(res);
 }
 
+//Méthode qui permet à partir du caractère passé en paramètre de renvoyer la bonne forme du prompt :
+// - soit la version avec la date (nom jour, numéro jour et numéro mois)
+// - soit la vesion avec l'heure, les minutes et les secondes
 char* informationsTemps(char unite){
     // variable qui va contenir le nombre de secondes écoulées depuis le 1er janvier 1970
     time_t tempsActuel;
@@ -359,6 +386,7 @@ char* informationsTemps(char unite){
     //création du prompt
     char temps[40];
 
+    // le prompt prend différentes formes en fonction du caratère passé en paramètre
     if(unite == 'd'){//date de la forme : mer. janv. 17
         strftime(temps, sizeof(temps), "%a. %b. %d", tempsInfo);
         //on ajoute la date au prompt
@@ -368,8 +396,11 @@ char* informationsTemps(char unite){
         return strdup(temps);
     }
     
+    //si on arrive ici c'eqt qu'il y a une erreur
     return "error";
 }
+
+//Méthode qui permet de récupérer et de renvoyer le prompt courant/actuel, sous la bonne forme en fonction de ses paramètres
 char* recupererPromptCourant() {
     // On utilise strdup pour créer une copie de la chaîne PS1
     char* prompt = strdup(getenv("PS1"));
@@ -411,6 +442,7 @@ char* recupererPromptCourant() {
                         break;
                 }
             } else if (prompt[i] == '\0') {
+                //prompt par défaut
                 strcpy(promptCourant, ">");
             }
         } else {
@@ -429,7 +461,7 @@ char* recupererPromptCourant() {
     return strdup(promptCourant);
 }
 
-// méthode qui permet de vérifier si une commande PS1 est valide et qui retourne la valeur du PS1
+// méthode/automate qui permet de vérifier si une commande PS1 est valide et qui retourne la valeur du PS1
 char* verifierPS1EtRetournerValeur(char *commande) {
     #define S_DEPART                    1
     #define S_LETTRE_P                  2
@@ -553,13 +585,11 @@ char* verifierPS1EtRetournerValeur(char *commande) {
                 break;
         }
     }
-
-    // Vous n'avez pas besoin de realloc ici, strdup alloue déjà suffisamment d'espace.
+    // erreur
     if(state == S_ERREUR){
-        free(ps1); // Libérez la mémoire allouée pour ps1 en cas d'erreur
-        return "pasUneCommandePourChangerLePS1"; // 1 correspond à une erreur 
+        free(ps1);
+        return "pasUneCommandePourChangerLePS1";
     }
-
     // réussite
     return ps1;
 }
@@ -625,18 +655,11 @@ int main(int argc, char** argv) {
             exit(EXIT_SUCCESS);
         }
 
-
         mbash(recupererCheminCmd());
 
-
-
         free(input);
-
         free(prompt);
-
-
     
     }
-
     return 0;
 }
