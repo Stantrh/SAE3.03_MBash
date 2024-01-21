@@ -23,11 +23,14 @@
 #define MAXLI 2048
 
 char commande[MAXLI];
+pid_t pidParent; // Pid du processus qui exécute globalement l'application
+int codeRetourGlobal = 0; // Code de retour qui change selon les commandes de l'utilisateur et leur succès/echec
+
 
 // On crée une structure qui contiendra le nombre de commandes et les commandes elles-mêmes
 typedef struct{
-    char commandes[TAILLEHISTORIQUE][MAXLI];
-    int count;  
+    char commandes[TAILLEHISTORIQUE][MAXLI]; // Contient les commandes de l'utilisateur
+    int count; // Nombre de commandes
 } Historique;
 
 // On initialise l'historique pour pouvoir après l'utiliser dans mbash
@@ -40,6 +43,9 @@ void clearConsole() {
     printf("\033[H\033[J");
 }
 
+/**
+ * Grâce à cette méthode on peut ajouter la commande que l'utilisateur vient d'entrer dans la structure qui contient les commandes
+*/
 void ajouterHistorique(Historique *historique, const char *cmd){
     if(historique->count < TAILLEHISTORIQUE){ // Si l'historique n'est pas complètement rempli
         strcpy(historique->commandes[historique->count], cmd);
@@ -52,6 +58,9 @@ void ajouterHistorique(Historique *historique, const char *cmd){
     }
 }
 
+/**
+ * Affiche sous forme de liste l'historique
+*/
 void afficherHistorique(const Historique *historique){
     for(int i = 0; i < historique->count; i++){
         printf("%d: %s\n", i + 1, historique->commandes[i]);
@@ -110,6 +119,7 @@ void gestionnaireSignal(int signal) {
     }
 }
 
+int numBackgroundJobs = 1;
 
 void mbash(char* recuperer) {
     // On associe à SIGINT la fonction qui gère les CTRL + C
@@ -129,15 +139,30 @@ void mbash(char* recuperer) {
         token = strtok(NULL, " ");
     }
 
+    
+
 
     args[i] = NULL; // Dernier élément du tableau doit être NULLS
+
+
+
+    // On regarde si le dernier argument est un & et si oui alors on exécutera la commande en arrière plan
+    int executeEnArrierePlan = 0;
+    if ((i > 0 && strcmp(args[i - 1], "&") == 0) && (recuperer != NULL)) {
+        printf("EXECUTER EN ARRRIERE PLAN \n");
+        executeEnArrierePlan = 1;
+        // args[i - 1] = NULL; // Supprime "&" de la liste des arguments
+    }
+
+
+
     char* env[] = {NULL};
 
     // Affichage de chaque élément du tableau args
-    //printf("Contenu de args :\n");
-    //for (int j = 0; args[j] != NULL; ++j) {
+    // printf("Contenu de args :\n");
+    // for (int j = 0; args[j] != NULL; ++j) {
     //    printf("args[%d] = %s\n", j, args[j]);
-    //}
+    // }
 
     if(recuperer == NULL){ // Si la commande which n'a rien retourné alors Sil faut qu'on vérifie le nom de la commande pour voir si elle a été reprogrammée par nos soins
          // Par convention et exigence de execve, le premier élément d'args doit toujours contenir le nom de la commande.
@@ -145,12 +170,14 @@ void mbash(char* recuperer) {
         // Faire un switch est impossible car permet seulement de comparer un caractère à la fois ou des entiers etc... mais pas des chaînes directement
         if(strcmp(args[0], "cd") == 0){
             int res = cd(args[1]);
+            codeRetourGlobal = res;
             if (res == -1) {
-                fprintf(stderr, "Erreur lors de l'exécution de la commande cd\n");
+                codeRetourGlobal = 1;
             }
             
         }else if(strcmp(args[0], "history") == 0){
             afficherHistorique(&historique);
+            codeRetourGlobal = 0;
         }else if (strcmp(args[0], "cdd") == 0) {
             const char *imagePath = "lol.gif";
 
@@ -174,33 +201,65 @@ void mbash(char* recuperer) {
 
                 // Fermeture du fichier de sortie de Chafa
                 pclose(chafaOutput);
-
+                codeRetourGlobal = 0;
             }
         }else if(strcmp(args[0], "cls") == 0){
             clearConsole();
+            codeRetourGlobal = 0;
+        }else if (strcmp(args[0], "$?") == 0) {
+            printf("%d\n", codeRetourGlobal);
+        } else if (strcmp(args[0], "$$") == 0) {
+            printf("%d\n", pidParent);
+            codeRetourGlobal = 0;
+        }else if(strcmp(args[0], "help")== 0) {
+            
         }else{
+            codeRetourGlobal = 127;
             printf("\033[0;31m");
             printf("%s", "Commande à reprogrammer car contenue directement dans Bash ou alors inexistante\n");
         }
         
-    }else{
+    }else{ // si récuperer != null
         // On crée un nouveau processus
         pid_t pid = fork();
 
         // Si c'est le processus fils qui exécute le code
         if(pid == 0){
+            // Si la commande est destinée à s'exécuter en arrière-plan, redirige la sortie standard et d'erreur vers /dev/null
+            if (executeEnArrierePlan) {
+                freopen("/dev/null", "w", stdout);
+                freopen("/dev/null", "w", stderr);
+            }
+
+            // On vérifie si ça contient $$ ou $?
+            for (int j = 0; args[j] != NULL; ++j) {
+                if (strcmp(args[j], "$$") == 0) {
+                    // On remplace $$ par le pid du parent 
+                    char pidStr[20];
+                    snprintf(pidStr, sizeof(pidStr), "%d", pidParent);
+                    args[j] = strdup(pidStr);
+                } else if (strcmp(args[j], "$?") == 0) {
+                    // On remplace $? par le dernier code de retour
+                    char codeRetourStr[20];
+                    snprintf(codeRetourStr, sizeof(codeRetourStr), "%d", codeRetourGlobal);
+                    args[j] = strdup(codeRetourStr);
+                }
+            }
+
+
             // On enregistre le code de retour de la commande avec execve
             int retour = execve(recuperer, args, env);
+            codeRetourGlobal = retour;
             if(retour == -1){ // On catch une erreur et on l'affiche
                 perror("execve");
                 exit(EXIT_FAILURE); // On termine le processus fils
             }
         }else if(pid > 0){
-            // Vérifier si y a & dans la commmande
-            // Si oui, alors pas de wait pid
-            // si non, wait pd
-            if(1){
-                waitpid(pid, NULL, 0); // Donc il faut attendre que son processus fils se finisse
+            // Si la commande est destinée à s'exécuter en arrière plan on ne met pas de waitpid, sinon on en met un
+            if (executeEnArrierePlan) {
+                printf("[%d] %d\n", numBackgroundJobs++, pid); // Affiche le PID du processus en arrière-plan
+            } else {
+                waitpid(pid, &codeRetourGlobal, 0);
             }
         } else { // Si le fork n'a pas fonctionné on met l'erreur, (pas assez de mémoire par exemple)
             perror("fork");
@@ -301,60 +360,69 @@ char* informationsTemps(char unite){
     
     return "error";
 }
-
-// Méthode qui permet de récupérer le prompt courant pour l'afficher
 char* recupererPromptCourant() {
-    char* prompt = malloc(strlen(getenv("PS1")+10));
-    prompt = getenv("PS1");
+    // On utilise strdup pour créer une copie de la chaîne PS1
+    char* prompt = strdup(getenv("PS1"));
+    if (!prompt) {
+        perror("Erreur lors de la récupération du prompt");
+        exit(EXIT_FAILURE);
+    }
 
-    //taille max du prompt
-    char* promptCourant = malloc(100);
-    
+    // Taille maximale du prompt
+    char promptCourant[256]; // Utilisation d'une taille statique pour simplifier
+
+    // Initialisation de promptCourant
+    promptCourant[0] = '\0';
+
     for (int i = 0; prompt[i] != '\0'; i++) {
         if (prompt[i] == '\\') {
             i++;
             if (prompt[i] != '\0') {
                 switch (prompt[i]) {
-                    case 'w': //chemin absolut du répertoire courant
-                        //strcat(promptCourant, recupererResultatComande("pwd")); //ça pose des problèmes
-                        sprintf(promptCourant, "%s%s", promptCourant, recupererResultatComande("pwd"));
-                        //promptCourant = recupererResultatComande("pwd");
+                    case 'w':
+                        strcat(promptCourant, recupererResultatComande("pwd"));
                         break;
-                    case 'u': //nom de l'utilisateur actuel
-                        //strcat(promptCourant, recupererResultatComande("whoami")); //ça pose des problèmes
-                        sprintf(promptCourant, "%s%s", promptCourant, recupererResultatComande("whoami"));
-                        //promptCourant = recupererResultatComande("whoami");
+                    case 'u':
+                        strcat(promptCourant, recupererResultatComande("whoami"));
                         break;
-                    case 't': //heure au format HH:MM:SS
-                        sprintf(promptCourant, "%s%s", promptCourant, informationsTemps('t'));
+                    case 't':
+                        strcat(promptCourant, informationsTemps('t'));
                         break;
-                    case 'd': //date de la forme : mer. janv. 17
-                        sprintf(promptCourant, "%s%s", promptCourant, informationsTemps('d'));
+                    case 'd':
+                        strcat(promptCourant, informationsTemps('d'));
                         break;
                     default:
-                        promptCourant = strdup(prompt);
+                        // Pour les caractères inconnus, on les ajoute simplement au promptCourant
+                        strncat(promptCourant, &prompt[i], 1);
                         break;
                 }
             } else if (prompt[i] == '\0') {
-                promptCourant = strdup(">");
+                strcpy(promptCourant, ">");
             }
-        }else{
-            //sprintf(promptCourant, "%c", promptCourant, prompt[i]);
+        } else {
+            // On ajoute le caractère actuel au promptCourant
             strncat(promptCourant, &prompt[i], 1);
         }
     }
- 
-    //on ajoute $ à la fin du prompt
+
+    // On libère la mémoire allouée pour prompt, car nous avons maintenant une copie
+    free(prompt);
+
+    // On ajoute "$" à la fin du prompt
     strcat(promptCourant, " $ ");
-    return promptCourant;
+
+    // On alloue de la mémoire pour le résultat final et on le retourne
+    return strdup(promptCourant);
 }
+
+
 
 
 
 int main(int argc, char** argv) {
     historique.count = 0;
 
-
+    pidParent = getpid();
 
     clearConsole();
     printf("PID PARENT : %d\n", getpid());
@@ -376,14 +444,13 @@ int main(int argc, char** argv) {
 
     while (1) {
 
-
-        changerPrompt("\\u \\u");
+        changerPrompt("\\u@\\w");
         char* prompt = recupererPromptCourant();
         
         // on alloue de la mémoire pour le nouveau prompt
         char *promptAvecCouleur = malloc(strlen(prompt) + 20);
 
-        //on ajoute de la couleur au prompt et on remets la couleur blanche pour la commande tapée par l'utilisateur
+        //on ajoute de la couleur au prompt et on remet la couleur blanche pour la commande tapée par l'utilisateur
         strcpy(promptAvecCouleur, "\033[0;35m");
         strcat(promptAvecCouleur, prompt);
         strcat(promptAvecCouleur, "\033[0;37m");
@@ -407,13 +474,20 @@ int main(int argc, char** argv) {
         if(strcmp(input, "exit") == 0){
             printf("\033[0;32m");
             printf("Merci d'avoir utilisé Mbash\n");
-            printf("PID : %d\n", getpid());
             exit(EXIT_SUCCESS);
         }
 
+
         mbash(recupererCheminCmd());
 
+
+
         free(input);
+
+        free(prompt);
+
+
+    
     }
 
     return 0;
