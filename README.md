@@ -293,7 +293,7 @@ mbash
 
 Il peut alors exploiter toutes les fonctionnalités du mini bash.
 
-[Capture vidéo du 21-01-2024 22:21:58.webm](video_1.webm)
+[Capture vidéo du 21-01-2024 22:21:58.webm](images/video_1.webm)
 
 ## Scénario : cycle de vie
 
