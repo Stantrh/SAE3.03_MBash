@@ -212,19 +212,66 @@ Il ne reste maintenant plus qu’à créer le dépôt avec :
 reprepro --ask-passphrase -Vb . includedeb jammy /home/stantheman/Documents/TestDebian/mbash_0.1_all.deb
 ```
 
+Cela nous demandera notre passphrase pour la dernière fois, et ce sera bon.
+Le résultat est tel que : 
+
+![image_4](images/image_4.png)
+
+Maintenant, nous allons nous concentrer sur la partie client pour que notre dépôt soit accessible.
+
+Nous resterons sur la même machine.
+
 ## Partie client :
 
-## 
+Le client va devoir exporter la clé publique du serveur (générée par RSA) dans son /usr/share/keyrings/ sous le nom de mbash.key
 
-### 
+Pour ce faire, (comme nous sommes sur la même machine pour client et serveur) nous allons utiliser la commande : 
 
-## Scénario : cycle de vie
+```bash
+gpg --armor --export stanislas.troha8@etu.univ-lorraine.fr
+```
+
+et rediriger son flux dans le fichier mbash.key situé dans /usr/share/keyrings
+
+```bash
+gpg --armor --export stanislas.troha8@etu.univ-lorraine.fr > /usr/share/keyrings/mbash.key
+```
+
+A noter qu’on reste en root pour faire ça.
+
+Maintenant on ajoute la clé qu’on a exportée à APT (Advanced Package Tool)
+
+```bash
+apt-key add /usr/share/keyrings/mbash.key
+```
+
+Puis dans /etc/apt/ on modifie le fichier sources.list pour indiquer qu’apt peut aller chercher le dépôt sur [localhost](http://localhost) (comme on utilise la même machine) sinon on aurait spécifié l’ip de la machine serveur ainsi que le port 80 utilisé par apache2 par défaut.
+
+On ajoute cette ligne dans /etc/apt/sources.list
+
+```bash
+deb http://localhost/debian/ jammy main
+```
+
+Le fichier sources.list doit ressembler à ça (plus ou moins)
+
+![image_5](images/image_5.png)
+
+On met à jour APT : 
+
+```bash
+apt update
+```
+
+Et le client peut désormais installer bash
 
 Un utilisateur lambda peut installer mbash à l’aide de la commande :
 
 ```bash
 sudo apt install mbash
 ```
+
+![image_6](images/image_6.png)
 
 Il la possibilité de mettre à jour la base locale de version :
 
@@ -245,3 +292,57 @@ mbash
 ```
 
 Il peut alors exploiter toutes les fonctionnalités du mini bash.
+
+[Capture vidéo du 21-01-2024 22:21:58.webm](video_1.webm)
+
+## Scénario : cycle de vie
+
+### Côté serveur :
+
+On recrée un package debian v0.2 identique au v0.1 avec les modifications supplémentaires.
+
+Donc on fera bien attention à modifier le fichier control.
+
+ 
+
+![image_7](images/image_7.png)
+
+Puis on rebuild le package avec : 
+
+```bash
+dpkg-deb --build mbash_0.2_all
+```
+
+On resigne le paquet : 
+
+```bash
+dpkg-sig --sign builder mbash_0.2_all.deb
+```
+
+![image_8](images/image_8.png)
+
+```bash
+reprepro -b /var/www/html/debian includedeb jammy /home/stantheman/Documents/TestDebian/mbash_0.2_all.deb
+```
+
+La passphrase nous est redemandée : 
+
+![image_9](images/image_9.png)
+
+![image_10](images/image_10.png)
+
+### Côté client
+
+Déjà faire : 
+
+```bash
+sudo apt update
+```
+
+Il ne reste plus qu’au client de télécharger les mises à jour 
+
+![image_11](images/image_11.png)
+
+Et le client, en lançant mbash obtient bien la v0.2
+
+![image_12](images/image_12.png)
