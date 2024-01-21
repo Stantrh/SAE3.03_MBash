@@ -116,7 +116,7 @@ dpkg-deb --build mbash_0.1_all
 
 - Voici le terminal lors de l’exécution de ces étapes et ce qu’il doit retourner à la fin :
 
-![Untitled](Untitled.png)
+![image_1](images/image_1.png)
 
 Pour l’installer il suffit de faire : 
 
@@ -145,7 +145,7 @@ Les informations importantes suite à cette commande sont :
 - Et l’adresse électronique : stanislas.troha8@etu.univ-lorraine.fr
 - La clé générée : 0A8425FAB84CE9321DAB79045F1B129AED506FEE
 
-![Untitled](Untitled%201.png)
+![image_2](images/image_2.png)
 
 Ensuite on va devoir signer le package debian  (cette commande signe avec la première clé créée si jamais y en a plusieurs sur la machine)
 
@@ -155,7 +155,7 @@ dpkg-sig --sign builder mbash_0.1_all.deb
 
 Cela doit retourner quelque chose comme ça après qu’on ait fourni notre passphrase : 
 
-![Untitled](Untitled%202.png)
+![image_3](images/image_3.png)
 
 Nous allons maintenant passer au serveur apache.
 Pour ça, on a besoin d’apache2 (dans les dépendances du package debian au cas où il ne soit pas installé)

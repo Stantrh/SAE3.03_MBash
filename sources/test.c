@@ -145,7 +145,7 @@ void mbash(char* recuperer) {
         }
 
 
-        args[i] = NULL; // Dernier élément du tableau doit être NULLS
+        args[i] = NULL; // Dernier élément du tableau doit être NULL
 
 
 
