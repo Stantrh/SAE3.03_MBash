@@ -403,7 +403,7 @@ char* recupererPromptCourant() {
                         strcat(promptCourant, informationsTemps('d'));
                         break;
                     case '\\':
-                        sprintf(promptCourant, "%s%s", promptCourant, "\\");
+                        strcat(promptCourant, "\\");
                         break;
                     default:
                         // Pour les caractères inconnus, on les ajoute simplement au promptCourant
@@ -572,8 +572,7 @@ int main(int argc, char** argv) {
     pidParent = getpid();
 
     clearConsole();
-    printf("PID PARENT : %d\n", getpid());
-    changerPrompt("\\u $ ");
+    changerPrompt("\\u");
 
 
     printf(R"EOF(
@@ -592,7 +591,6 @@ int main(int argc, char** argv) {
 
     while (1) {
 
-        changerPrompt("feur");
         char* prompt = recupererPromptCourant();
         
         // on alloue de la mémoire pour le nouveau prompt
