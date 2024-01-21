@@ -45,9 +45,7 @@ La logique de fonctionnement de notre application est telle que :
 - commande & : permet de lancer la commande en arrière plan
 - Toutes les commandes non natives à bash sur la machine de l’utilisateur (ex : /usr/bin/ls /usr/bin/pwd etc…)
 
-Information sur le package debian et sur apt get
 
-Information complémentaires, ex : comment compiler notre programme*
 
 ## Librairies utilisées :
 
