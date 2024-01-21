@@ -8,6 +8,10 @@ TROHA Stanislas
 
 S3A
 
+## 
+
+# Partie I : MBash
+
 ## Présentation générale
 
 Mbash est une version très réduite du vrai bash. Nous avons décidé d’utiliser execve, c’est une option bien plus intéressante (autant dans la programmation que dans l’utilisation) que system ou ses alternatives. Avec execve, contrairement à execvp, une alternative plus simple, la spécification du path est inutile car il ne va pas chercher dans le path le chemin de l’exécutable.
