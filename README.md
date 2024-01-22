@@ -197,7 +197,7 @@ Version: 0.1
 Architectures: i386 amd64 arm64 source
 Components: main non-free contrib
 Description: Version limitée qui reproduit bash
-SignWith: DA45991405E9AA4AC2E746299CF6A22834C0E288
+SignWith: XXXXXXXXXXXXX
 ```
 
 Pour le SignWith, on peut récupérer ses clés avec la commande : 
